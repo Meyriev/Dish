@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<defs>
+<radialGradient id="g" cx="512" cy="1120" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(512 1120) scale(820 560) translate(-512 -1120)"><stop offset="0" stop-color="#f5a623"/><stop offset=".3" stop-color="#b9700f"/><stop offset=".62" stop-color="#5a3206" stop-opacity=".75"/><stop offset="1" stop-color="#3a2004" stop-opacity="0"/></radialGradient>
+<radialGradient id="h" cx="512" cy="512" r="330" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffd9a0" stop-opacity=".2"/><stop offset="1" stop-color="#ffd9a0" stop-opacity="0"/></radialGradient>
+<linearGradient id="l" x1="0" y1="312" x2="0" y2="712" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#ffecc9"/></linearGradient>
+<filter id="b" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="16"/></filter>
+</defs>
+<rect width="1024" height="1024" rx="232" fill="#0a0806"/><rect width="1024" height="1024" rx="232" fill="url(#g)"/><rect width="1024" height="1024" fill="url(#h)"/>
+<g transform="translate(512 512) scale(1) translate(-512 -512)"><path d="M340 312H498A200 200 0 0 1 498 712H340ZM402 372V652H498A140 140 0 0 0 498 372Z" fill="#ffd9a0" fill-rule="evenodd" opacity=".55" filter="url(#b)"/><path d="M340 312H498A200 200 0 0 1 498 712H340ZM402 372V652H498A140 140 0 0 0 498 372Z" fill="url(#l)" fill-rule="evenodd"/></g></svg>
