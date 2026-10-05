@@ -1,0 +1,1619 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Desharhozam</title>
+<meta name="description" content="Читалка: открывает FB2, EPUB, PDF, DOCX и TXT в одну удобную колонку, хранит цитаты и мысли.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0806">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Desharhozam">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>html,body{margin:0;height:100%;background:#212121}</style>
+</head>
+<body>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=Literata:opsz,wght@7..72,400..600&family=Source+Serif+4:opsz,wght@8..60,400..600&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+/* Layout: one column. Library: the book you are reading on top as one card, the rest as a grid of covers, a dock at the bottom. Reader: bare text and one row at the bottom (back, chapter and percent, type); the row turns into copy / keep when a passage is picked. */
+:root{
+  color-scheme:dark;
+  --gut:16px; --pad:20px; --tx:calc(var(--gut) + var(--pad));
+  --gap-in:8px; --gap:12px; --gap-far:24px;
+  --r-card:28px; --r-ctl:16px;
+  --h-s:28px; --h-m:40px; --h-l:52px;
+  --tbb:calc(clamp(10px,2.2vh,20px) + env(safe-area-inset-bottom,0px));
+  --bg:#212121; --surf:#2a2a2a; --ink:#ececec; --ink-2:#d6d6d6; --ink-3:#b4b4b4; --ink-4:#8f8f8f;
+  --line:#ffffff1a; --line-2:#ffffff2b; --mark:#ffffff2e; --pri:#ffffff; --pri-on:#0d0d0d;
+  /* floating controls follow the page: a step lighter on dark, a step darker on light */
+  --chrome:#2f2f2f; --on:#ececec; --on-2:#b4b4b4; --on-soft:#ffffff14; --on-soft-2:#ffffff26; --shade:#00000059;
+  --light:#ececec; --danger:#ff7b72;
+  --font:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --serif:Literata,'Iowan Old Style',Georgia,serif;
+  --read:var(--font); --fs:19px; --fw:400;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+:root[data-read="light"]{color-scheme:light;--bg:#ffffff;--surf:#f9f9f9;--ink:#0d0d0d;--ink-2:#2f2f2f;--ink-3:#5d5d5d;--ink-4:#8f8f8f;--line:#0000001a;--line-2:#00000029;--mark:#0000001f;--pri:#0d0d0d;--pri-on:#ffffff;
+  --chrome:#f4f4f4;--on:#0d0d0d;--on-2:#5d5d5d;--on-soft:#0000000f;--on-soft-2:#0000001f;--shade:#0000001f;--light:#0d0d0d;--danger:#d92d20}
+:root[data-read="paper"]{color-scheme:light;--bg:#faf9f5;--surf:#f0eee6;--ink:#141413;--ink-2:#3d3d3a;--ink-3:#73726c;--ink-4:#a3a199;--line:#1414131a;--line-2:#14141329;--mark:#1414131f;--pri:#141413;--pri-on:#faf9f5;
+  --chrome:#f0eee6;--on:#141413;--on-2:#73726c;--on-soft:#1414130f;--on-soft-2:#1414131f;--shade:#1414131a;--light:#141413;--danger:#b53333}
+@media(max-width:380px){:root{--pad:16px}}
+@supports (width:round(down,1px,1px)){:root{--tbb:calc(round(down,clamp(10px,2.2vh,20px),1px) + env(safe-area-inset-bottom,0px))}}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{height:100%;overflow:hidden}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.4 var(--font);transition:background .3s}
+button,input{font:inherit;color:inherit;border:0;background:none;padding:0;margin:0}
+button{cursor:pointer}
+:focus-visible{outline:1.5px solid var(--light);outline-offset:2px}
+.app{position:relative;height:100%;max-width:560px;margin:0 auto;overflow:hidden;overflow:clip;background:var(--bg);transition:background .3s}
+svg{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}}
+
+/* one set of state marks everywhere: a ring that fills, a check, an alert */
+.ring{width:20px;height:20px;flex:none;stroke-width:2}
+.ring .tr{stroke:var(--line-2)}
+.ring .ar{stroke:var(--light);transition:stroke-dasharray .3s}
+.ring.ok{stroke:var(--light)}
+.ring.bad{stroke:var(--danger)}
+.ring.spin{animation:turn 1s linear infinite}
+@keyframes turn{to{transform:rotate(1turn)}}
+.job .ring .tr,.rpill .ring .tr{stroke:var(--on-soft-2)}
+/* floating controls */
+.round,.rpill,.act,.seg.big,.job,.sheet{background:var(--chrome);color:var(--on);box-shadow:inset 0 0 0 1px var(--line)}
+.round{width:var(--h-l);height:var(--h-l);flex:none;border-radius:50%;display:grid;place-items:center;font-weight:500;transition:transform .14s var(--ease),background .2s,color .2s}
+.round:active,.act:active,.rpill:active{transform:scale(.96)}
+.round svg{width:18px;height:18px}
+/* a choice: the marker slides under the chosen option */
+.seg{position:relative;display:flex;height:var(--h-m);padding:4px;border-radius:20px;background:var(--on-soft)}
+.seg .th{position:absolute;top:4px;bottom:4px;border-radius:16px;background:var(--on);transition:left .28s var(--ease),right .28s var(--ease)}
+.seg button{position:relative;flex:1;min-width:0;border-radius:16px;font-size:13px;color:var(--on-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .2s}
+.seg button[aria-pressed="true"]{color:var(--chrome)}
+.seg.big{width:216px;height:var(--h-l);border-radius:26px}
+.seg.big .th,.seg.big button{border-radius:22px}
+.seg.big button{font-size:14px}
+
+/* library */
+.scroll{height:100%;overflow-y:auto;overscroll-behavior:contain;padding:var(--gap-far) var(--gut) calc(var(--tbb) + var(--h-l) + 2*var(--gap-far));scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+h1{margin:0 0 var(--gap-far);padding-inline:var(--pad);font-size:28px;font-weight:400;letter-spacing:-.035em;line-height:1.1}
+#count{color:var(--ink-3)}
+.hint{margin:var(--pad) 0 0;padding-inline:var(--pad);font-size:13px;color:var(--ink-3);text-wrap:pretty}
+/* a cover is set from the book's own title; its colour is fixed by the title */
+.cv{position:relative;display:block;aspect-ratio:3/4;border-radius:10px;overflow:hidden;pointer-events:none;box-shadow:inset 0 0 0 1px #0000001f}
+.cv i{position:absolute;left:14px;right:14px;top:14px;font-style:normal;font-size:11px;line-height:1.3;opacity:.8;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cv em{position:absolute;right:-4px;top:18px;font:400 120px/1 var(--serif);font-style:normal;opacity:.13}
+.cv b{position:absolute;left:14px;right:14px;bottom:18px;font:400 19px/1.12 var(--serif);letter-spacing:-.01em;overflow-wrap:break-word;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.cv u{position:absolute;left:0;bottom:0;height:3px;width:calc(var(--p,0)*100%);background:currentColor;opacity:.9}
+.hero{position:relative;display:flex;gap:var(--pad);padding:var(--pad);margin-bottom:var(--gap-far);border-radius:var(--r-card);background:var(--surf);box-shadow:inset 0 0 0 1px var(--line);animation:rise .34s var(--ease) both}
+.hero .cv{width:112px;flex:none}
+.hero .cv b{font-size:14px;left:10px;right:10px;bottom:12px}
+.hero .cv i{left:10px;right:10px;top:10px;font-size:9px}
+.hero .cv em{font-size:76px}
+.hopen,.topen{position:absolute;inset:0;border-radius:inherit}
+.hmeta{flex:1;min-width:0;display:flex;flex-direction:column;pointer-events:none}
+.hmeta b{padding-right:var(--h-s);font:400 24px/1.12 var(--serif);letter-spacing:-.015em;overflow-wrap:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.hmeta>i{margin-top:6px;font-style:normal;font-size:13px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hmeta span{margin-top:auto;padding-top:var(--gap);font-size:13px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.hrow{display:flex;align-items:center;gap:var(--gap);margin-top:var(--gap)}
+.hring{position:relative;width:var(--h-m);height:var(--h-m);flex:none;display:grid;place-items:center;font-size:11px;font-style:normal;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.hring svg{position:absolute;inset:0;width:100%;height:100%}
+/* the primary action is the one light button on the screen */
+.hmeta em{height:var(--h-m);padding-inline:var(--pad);border-radius:20px;display:grid;place-items:center;font-style:normal;font-weight:500;background:var(--pri);color:var(--pri-on)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--pad) var(--gap)}
+.tile{position:relative;min-width:0;display:flex;flex-direction:column;gap:var(--gap-in);border-radius:12px;animation:rise .34s var(--ease) both}
+.tm .ring{width:14px;height:14px}
+.tm{display:flex;align-items:center;gap:6px;padding-inline:4px;font-size:13px;color:var(--ink-3);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kx{position:absolute;z-index:1;top:8px;right:8px;min-width:var(--h-s);height:var(--h-s);border-radius:14px;display:grid;place-items:center;background:#0000008c;color:#fff;font-size:13px}
+.hero .kx{top:var(--gap);right:var(--gap);background:var(--line);color:var(--ink-3)}
+.kx.ask{padding-inline:12px;background:#000000c7;color:var(--danger)}
+.kx svg{width:12px;height:12px}
+/* the library: the book in hand on top, the rest as plain rows under a hairline */
+.ed{margin:0 calc(-1*var(--gut))}
+.ed-top{position:relative;display:flex;gap:var(--pad);padding:0 var(--tx) var(--gap-far);border-bottom:1px solid var(--line)}
+.ed-top .cv{width:104px;flex:none;align-self:flex-start}
+.ed-top .cv b,.ed-top .cv i{display:none}
+.ed-top .cv em{font-size:84px;top:14px}
+.ed-body{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;padding-right:var(--h-s)}
+.ed-title{margin:0;font:400 24px/1.15 var(--font);letter-spacing:-.025em;overflow-wrap:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.ed-auth{margin:6px 0 0;font-size:14px;color:var(--ink-3)}
+.ed-meta{margin:auto 0 0;padding-top:var(--gap);font-size:13px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.ed-go{position:relative;z-index:1;margin-top:var(--gap);height:var(--h-m);padding-inline:var(--pad);border-radius:20px;background:var(--pri);color:var(--pri-on);font-weight:500;transition:transform .14s var(--ease)}
+.ed-go:active{transform:scale(.97)}
+.eopen{position:absolute;inset:0}
+.erow{position:relative;display:flex;align-items:center;gap:var(--gap);padding:var(--gap) var(--tx);animation:rise .3s var(--ease) both}
+.erow+.erow::before{content:"";position:absolute;top:0;left:var(--tx);right:var(--tx);height:1px;background:var(--line)}
+.et{flex:1;min-width:0;pointer-events:none}
+.et b{display:block;font-weight:400;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.et i{display:block;margin-top:2px;font-style:normal;font-size:13px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.erow .ring{pointer-events:none}
+.ed .kx{position:relative;top:auto;right:auto;flex:none;background:none;color:var(--ink-4)}
+.ed .kx.ask{background:var(--surf);color:var(--danger)}
+.ed-top .kx{position:absolute;top:-4px;right:var(--gut)}
+/* ===== screens: home, search, notes, book page ===== */
+.view{animation:rise .3s var(--ease) both}
+.h{margin:0 0 var(--pad);padding:0;text-align:center;font-size:28px;font-weight:400;letter-spacing:-.035em;line-height:1.1}
+.sec{margin:44px 0 var(--pad);text-align:center;font-size:24px;font-weight:400;letter-spacing:-.03em;line-height:1.1}
+.cv img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+/* the book in hand: one card, title first, then a few lines of the book itself, the cover as a band, one action */
+.hc{position:relative;padding:var(--pad);border-radius:var(--r-card);background:var(--surf);box-shadow:inset 0 0 0 1px var(--line)}
+.hc h2{margin:0;font:400 clamp(32px,10vw,44px)/1 var(--font);letter-spacing:-.045em;overflow-wrap:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.hc .ex{margin:var(--gap-far) 0 0;font-size:14px;line-height:1.4;color:var(--ink-2);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.hc .mt{margin:var(--gap) 0 0;padding-top:var(--gap);border-top:1px solid var(--line);font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.band{position:relative;display:block;width:100%;height:148px;margin-top:var(--gap);border-radius:20px;overflow:hidden}
+.band img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 22%}
+.band em{position:absolute;right:8px;bottom:-34px;font:400 190px/1 var(--serif);font-style:normal;opacity:.18}
+.band u{position:absolute;left:0;bottom:0;height:3px;width:calc(var(--p,0)*100%);background:currentColor}
+.rowb{display:flex;gap:var(--gap-in);margin-top:var(--gap)}
+.pillb{flex:1;min-width:0;height:var(--h-l);border-radius:26px;background:var(--pri);color:var(--pri-on);font-weight:500;transition:transform .14s var(--ease)}
+.pillb.sub{background:none;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line-2)}
+.pillb:active,.circ:active{transform:scale(.97)}
+.circ{width:var(--h-l);height:var(--h-l);flex:none;border-radius:50%;display:grid;place-items:center;box-shadow:inset 0 0 0 1px var(--line-2);transition:transform .14s var(--ease)}
+.circ svg{width:18px;height:18px}
+/* a ribbon of large cards: the one in the middle is full size, its neighbours peek in from the sides */
+.car{display:flex;gap:var(--gap-in);margin-inline:calc(-1*var(--gut));padding:4px 15%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain}
+.car::-webkit-scrollbar{display:none}
+.cc{flex:0 0 100%;min-width:0;scroll-snap-align:center;display:flex;flex-direction:column;align-items:center;text-align:center;will-change:transform}
+.cc .cv{width:100%;border-radius:24px}
+.cc b{display:block;max-width:100%;margin-top:var(--gap);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cc i{display:block;max-width:100%;margin-top:2px;font-style:normal;font-size:13px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cc.q{align-items:stretch;text-align:left;padding:var(--pad);border-radius:24px;background:var(--surf);box-shadow:inset 0 0 0 1px var(--line)}
+.cc.q p{margin:0;font:400 17px/1.45 var(--serif);white-space:pre-line;display:-webkit-box;-webkit-line-clamp:7;-webkit-box-orient:vertical;overflow:hidden}
+.cc.q i{margin-top:var(--gap)}
+/* bottom bar: the tab you are on opens into a filled pill with its name */
+.nav{position:absolute;z-index:3;left:50%;bottom:var(--tbb);transform:translateX(-50%);display:flex;align-items:center;gap:var(--gap-in)}
+.nav .t{height:var(--h-l);padding-inline:17px;border-radius:26px;display:flex;align-items:center;background:var(--chrome);color:var(--on);box-shadow:inset 0 0 0 1px var(--line),0 4px 16px var(--shade);transition:background .25s,color .25s,transform .14s var(--ease)}
+.nav .t:active{transform:scale(.96)}
+.nav .t svg{width:18px;height:18px;flex:none}
+.nav .t span{max-width:0;opacity:0;overflow:hidden;white-space:nowrap;font-weight:500;transition:max-width .36s var(--ease),opacity .2s,margin .36s var(--ease)}
+.nav .t.on{background:var(--pri);color:var(--pri-on)}
+.nav .t.on span{max-width:96px;margin-left:8px;opacity:1}
+/* search */
+.search{display:flex;align-items:center;gap:var(--gap);height:var(--h-l);padding-inline:var(--pad);border-radius:26px;box-shadow:inset 0 0 0 1px var(--line-2);color:var(--ink-3);transition:box-shadow .2s}
+.search:focus-within{box-shadow:inset 0 0 0 1px var(--ink-3)}
+.search svg{width:18px;height:18px;flex:none}
+.search input{flex:1;min-width:0;outline:none;font-size:16px;color:var(--ink)}
+.search input::placeholder{color:var(--ink-4)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap-in);margin-top:var(--gap)}
+.tl{padding:var(--gap) var(--gap) var(--pad);border-radius:24px;box-shadow:inset 0 0 0 1px var(--line);display:flex;flex-direction:column;align-items:center;gap:var(--gap);transition:background .2s,transform .14s var(--ease)}
+.tl:active{transform:scale(.98)}
+.tl b{width:72%;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;background:var(--surf);font:400 44px/1 var(--font);letter-spacing:-.04em;font-variant-numeric:tabular-nums;transition:background .25s,color .25s}
+.tl.on b{background:var(--pri);color:var(--pri-on)}
+.rows{margin:var(--gap) calc(-1*var(--gut)) 0}
+.rows mark{background:var(--mark);color:inherit;border-radius:3px}
+.et b.wrap{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:15px;line-height:1.35}
+.sub{margin:var(--gap-far) 0 0;padding-inline:var(--pad);font-size:13px;color:var(--ink-3)}
+/* book page */
+.bpage{position:absolute;inset:0;z-index:4;background:var(--bg);transform:translateX(100%);visibility:hidden;transition:transform .36s var(--ease),visibility 0s .36s,background .3s}
+.bpage.on{transform:none;visibility:visible;transition:transform .36s var(--ease),background .3s}
+.bscroll{height:100%;overflow-y:auto;overscroll-behavior:contain;padding:calc(var(--gut) + var(--h-l) + var(--gap)) var(--gut) calc(var(--tbb) + var(--gap-far));scrollbar-width:none}
+.bscroll::-webkit-scrollbar{display:none}
+.bback{position:absolute;top:var(--gut);left:var(--gut)}
+.bp-cv{width:58%;margin:0 auto;border-radius:24px}
+.bp-t{margin:var(--pad) 0 0;text-align:center;font:400 30px/1.08 var(--font);letter-spacing:-.04em;text-wrap:balance;overflow-wrap:break-word}
+.bp-a{margin:6px 0 0;text-align:center;color:var(--ink-3)}
+.bp-m{margin:var(--gap) 0 0;text-align:center;font-size:13px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.bp-x{margin:0;padding-inline:var(--pad);font-size:15px;line-height:1.5;color:var(--ink-2);text-wrap:pretty}
+.chr{position:relative;display:flex;gap:var(--gap);width:100%;padding:var(--gap) var(--pad);text-align:left}
+.chr+.chr::before{content:"";position:absolute;top:0;left:var(--pad);right:var(--pad);height:1px;background:var(--line)}
+.chr span{flex:none;width:24px;color:var(--ink-4);font-size:13px;line-height:21px;font-variant-numeric:tabular-nums}
+.chr b{flex:1;min-width:0;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chr.now b{font-weight:500}
+.chr.now::after{content:"";align-self:center;width:6px;height:6px;border-radius:50%;background:var(--pri)}
+.facts{margin:0;padding-inline:var(--pad);display:grid;grid-template-columns:auto 1fr;gap:var(--gap-in) var(--gap);font-size:15px}
+.facts dt{color:var(--ink-3)}
+.facts dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.drop{display:block;margin:44px auto 0;height:var(--h-m);padding-inline:var(--pad);border-radius:20px;color:var(--ink-3);transition:color .2s,background .2s}
+.drop.ask{color:var(--danger);background:var(--surf)}
+.notes{margin-top:0}
+/* kept passages */
+.notes{display:flex;flex-direction:column;gap:var(--gap)}
+.note{padding:var(--pad);border-radius:var(--r-card);background:var(--surf);box-shadow:inset 0 0 0 1px var(--line);animation:rise .34s var(--ease) both}
+.note p{margin:0;font:400 18px/1.45 var(--serif);white-space:pre-line;text-wrap:pretty;overflow-wrap:break-word}
+.note small{display:block;margin-top:var(--gap);font-size:13px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nrow{display:flex;gap:var(--gap-in);margin-top:var(--pad)}
+.nb{height:var(--h-m);min-width:var(--h-m);border-radius:20px;display:grid;place-items:center;background:var(--line);transition:transform .14s var(--ease),background .2s,color .2s}
+.nb:active{transform:scale(.96)}
+.nb.wide{flex:1;font-weight:500}
+.nb.ok{background:var(--pri);color:var(--pri-on)}
+.nb svg{width:18px;height:18px}
+.ldock{position:absolute;z-index:3;left:var(--gut);right:var(--gut);bottom:var(--tbb);display:flex;justify-content:space-between;pointer-events:none}
+.ldock>*{pointer-events:auto}
+.job{position:absolute;z-index:3;left:50%;bottom:calc(var(--tbb) + var(--h-l) + var(--gap));max-width:calc(100% - 2*var(--gut));height:var(--h-l);padding:0 var(--pad) 0 6px;border-radius:26px;display:flex;align-items:center;gap:var(--gap);white-space:nowrap;font-variant-numeric:tabular-nums;
+  opacity:0;transform:translate(-50%,10px);pointer-events:none;transition:opacity .25s,transform .3s var(--ease)}
+.job.on{opacity:1;transform:translate(-50%,0)}
+.job b{height:var(--h-m);min-width:var(--h-m);padding-inline:10px;border-radius:20px;display:grid;place-items:center;background:var(--on-soft);font-size:12px;font-weight:500}
+.job>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.job>span:last-of-type{display:grid;flex:none}
+.job i{width:1px;height:16px;flex:none;background:var(--on-soft-2)}
+.job em{font-style:normal;font-size:13px;color:var(--on-2)}
+.job.bad>span{color:var(--danger)}
+.app.drag #add{background:var(--on);color:var(--chrome)}
+
+/* reader */
+.reader{position:absolute;inset:0;z-index:5;background:var(--bg);transform:translateY(100%);visibility:hidden;transition:transform .36s var(--ease),visibility 0s .36s,background .3s}
+.reader.on{transform:none;visibility:visible;transition:transform .36s var(--ease),background .3s}
+.rscroll{position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;padding:calc(var(--gap-far) + 20px) var(--tx) calc(var(--tbb) + var(--h-l) + 30vh);scrollbar-width:none}
+.rscroll::-webkit-scrollbar{display:none}
+article{font-family:var(--read);font-size:var(--fs);font-weight:var(--fw);line-height:1.6;hyphens:auto;-webkit-hyphens:auto;overflow-wrap:break-word;text-align:left}
+article>*{border-radius:6px;transition:background .2s,box-shadow .2s}
+article p{margin:0 0 .8em;text-wrap:pretty}
+article h2{margin:1.7em 0 .7em;font-family:var(--serif);font-size:1.4em;font-weight:400;line-height:1.2;letter-spacing:-.01em;text-wrap:balance;hyphens:manual}
+article .bt{margin:0 0 .25em;font-family:var(--serif);font-size:1.8em;line-height:1.1;font-weight:400;letter-spacing:-.015em;text-wrap:balance;hyphens:manual}
+article .ba{margin:0 0 2em;font-family:var(--font);font-size:14px;font-weight:400;color:var(--ink-3)}
+article .q{padding-left:var(--pad);font-style:italic;color:var(--ink-2);white-space:pre-line}
+article .v{white-space:pre-line;hyphens:manual;text-wrap:wrap;margin-bottom:1.1em}
+article .s{margin:1.4em 0 .8em;text-align:center;font-family:var(--serif);color:var(--ink-3)}
+article mark{color:inherit;background:var(--mark);border-radius:3px;padding:.12em 0;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+article .pick{background:var(--line);box-shadow:0 0 0 8px var(--line)}
+.fade{position:absolute;left:0;right:0;z-index:2;pointer-events:none;transition:opacity .3s}
+.fade.t{top:0;height:12%;background:linear-gradient(var(--bg) 25%,transparent)}
+.fade.b{bottom:0;height:18%;background:linear-gradient(transparent,var(--bg) 75%)}
+.reader.plain .fade.t{height:24px}
+.reader.plain .fade.b{height:calc(var(--tbb) + 40px)}
+/* the bottom row */
+.rdock{position:absolute;z-index:4;left:var(--gut);right:var(--gut);bottom:var(--tbb);display:flex;gap:var(--gap-in);transition:transform .32s var(--ease),opacity .22s}
+.rpill{flex:1;min-width:0;height:var(--h-l);border-radius:26px;display:flex;align-items:center;gap:var(--gap-in);padding:6px 6px 6px var(--pad);transition:transform .14s var(--ease)}
+.rpill svg{width:16px;height:16px;flex:none;color:var(--on-2)}
+.rpill b{flex:1;min-width:0;text-align:left;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rpill span{flex:none;height:var(--h-m);padding:0 12px 0 10px;border-radius:20px;display:flex;align-items:center;gap:6px;background:var(--on-soft);font-size:13px;font-variant-numeric:tabular-nums}
+.act{flex:1;min-width:0;height:var(--h-l);border-radius:26px;font-weight:500;transition:transform .14s var(--ease),background .2s,color .2s}
+.act.pri,.act.ok,.reader.s-set #aa{background:var(--pri);color:var(--pri-on)}
+.reader.quiet #rdock{transform:translateY(calc(100% + var(--tbb) + 8px));opacity:0}
+#pbar,.reader.pick #rdock{opacity:0;pointer-events:none;transform:translateY(12px)}
+.reader.pick #pbar{opacity:1;pointer-events:auto;transform:none}
+.sheet{position:absolute;z-index:4;left:var(--gut);right:var(--gut);bottom:calc(var(--tbb) + var(--h-l) + var(--gap-in));border-radius:var(--r-card);opacity:0;pointer-events:none;transform:translateY(12px) scale(.98);transform-origin:50% 100%;transition:opacity .18s,transform .3s var(--ease)}
+.sheet{transform:none;opacity:1;clip-path:inset(100% 0 0 0 round var(--r-card));transition:clip-path .36s var(--ease)}
+.reader.s-set #pset,.reader.s-toc #ptoc{pointer-events:auto;clip-path:inset(0 round var(--r-card))}
+/* the ruler: the whole book on one line; taller ticks are chapters; drag the frame to move */
+.ruler{position:relative;height:var(--h-m);margin:var(--gap) var(--gap-in) 0;touch-action:none;cursor:ew-resize;background:repeating-linear-gradient(90deg,var(--on-soft-2) 0 1px,transparent 1px 8px) 0 50%/100% 8px no-repeat}
+.ruler u{position:absolute;top:9px;bottom:9px;width:1px;background:var(--on-2)}
+.ruler i{position:absolute;top:8px;bottom:8px;left:calc(var(--p,0)*100%);width:20px;margin-left:-10px;border:1.5px solid var(--on);border-radius:7px;background:var(--chrome);transition:transform .14s var(--ease)}
+.ruler:active i{transform:scale(1.12)}
+.set{display:flex;flex-direction:column;gap:var(--pad);padding:var(--pad)}
+.srow{display:flex;align-items:center;justify-content:space-between;gap:var(--gap)}
+.set label,.srow>span{display:block;margin-bottom:var(--gap-in);font-size:13px;color:var(--on-2)}
+.srow>span{margin:0}
+.step{display:flex;align-items:center;gap:var(--gap)}
+.step b{min-width:28px;text-align:center;font-weight:400;font-variant-numeric:tabular-nums}
+.step button{width:var(--h-m);height:var(--h-m);border-radius:50%;display:grid;place-items:center;background:var(--on-soft);transition:transform .14s var(--ease)}
+.step button:active{transform:scale(.92)}
+.step svg{width:18px;height:18px}
+.thead{padding:var(--gap) var(--gap) 0}
+.thead p{margin:var(--gap) var(--gap-in) 0;font-size:13px;color:var(--on-2);font-variant-numeric:tabular-nums}
+.toc{max-height:44vh;overflow-y:auto;padding:var(--gap-in);scrollbar-width:none}
+.toc button{display:block;width:100%;padding:10px var(--gap);border-radius:var(--r-ctl);text-align:left;color:var(--on-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.toc button.now{color:var(--on);background:var(--on-soft)}
+.toc button.q{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.35;color:var(--on)}
+.toc p{margin:0;padding:var(--gap);color:var(--on-2)}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ===== clean pass: one type scale, one spacing scale, flat surfaces, air ===== */
+/* type: 12 caption · 14 secondary · 16 body · 22 section · 28 screen · 40 hero. Regular everywhere; medium only on things you press */
+/* space: 4 · 8 · 12 · 20 · 24, and 72 between sections */
+.scroll{padding-top:40px}
+.h{margin-bottom:var(--gap-far)}
+.sec{margin:72px 0 var(--gap-far);font-size:22px;letter-spacing:-.025em}
+.hc{padding:0 var(--pad);background:none;box-shadow:none;border-radius:0}
+.hc h2{font-size:40px;line-height:1.02;letter-spacing:-.045em;text-wrap:balance}
+.hc .mt{margin:var(--gap) 0 0;padding:0;border:0;font-size:14px;color:var(--ink-3)}
+.stage{display:grid;place-items:center;width:100%;height:320px;perspective:1000px}
+.stage .cv{width:164px;border-radius:6px;transform:rotateY(-26deg) rotateX(7deg) rotateZ(1.5deg);transform-origin:50% 50%;
+  box-shadow:inset 0 0 0 1px #00000026,1px 0 0 #00000040,26px 30px 50px -18px var(--shade);transition:transform .5s var(--ease)}
+.stage:active .cv{transform:rotateY(-12deg) rotateX(3deg)}
+.hc .rowb{margin:0}
+/* covers set from the title */
+.cv{container-type:inline-size;text-align:left;border-radius:6px;box-shadow:inset 0 0 0 1px #00000026}
+.cv b{position:absolute;left:9cqw;right:9cqw;top:9cqw;bottom:auto;font:500 10.5cqw/1.08 var(--font);letter-spacing:-.03em;-webkit-line-clamp:5}
+.cv i{position:absolute;left:9cqw;right:9cqw;top:auto;bottom:9cqw;padding-top:4cqw;border-top:1px solid currentColor;font-size:5.6cqw;line-height:1.2;opacity:.7;-webkit-line-clamp:2}
+.cv u{height:2px}
+.hero .cv b,.hero .cv i,.ed-top .cv b,.ed-top .cv i{display:block}
+/* ribbons */
+.car{padding:var(--gap) 20%;gap:var(--gap-in)}
+.cc .cv{border-radius:6px}
+.cc b{margin-top:var(--pad);font-size:16px;font-weight:500}
+.cc i{font-size:14px}
+.cc.q{border-radius:var(--r-card);background:none;box-shadow:inset 0 0 0 1px var(--line-2)}
+/* lists and cards without fills */
+.note{background:none;box-shadow:inset 0 0 0 1px var(--line-2)}
+.note small,.et i,.sub,.bp-m,.tm{font-size:14px}
+.et b{font-size:16px}
+.erow{padding-block:14px}
+.tl b{background:none;box-shadow:inset 0 0 0 1px var(--line-2);font-size:40px}
+.tl span{font-size:14px}
+/* book page */
+.bp-cv{width:52%}
+.bp-t{margin-top:var(--gap-far);font-size:28px;letter-spacing:-.035em}
+.bp-x,.facts,.chr b{font-size:16px}
+.bscroll>.rowb{margin-top:var(--gap-far)}
+.drop{margin-top:72px}
+
+/* ===== quiet pass: few controls, each one changes state instead of opening something new ===== */
+.lt{margin:0 0 var(--gap);padding-inline:var(--pad);font-size:34px;font-weight:500;letter-spacing:-.035em;line-height:1.1}
+.scroll{padding-top:var(--gap-far)}
+.search{margin-bottom:var(--gap-in);background:var(--on-soft);box-shadow:none;height:44px;border-radius:22px;padding-inline:16px}
+.search:focus-within{box-shadow:inset 0 0 0 1px var(--line-2)}
+/* a book is a row: cover, name, state, and one small button that reads it */
+.brow{position:relative;display:flex;align-items:center;gap:var(--gap);padding:10px var(--tx);animation:rise .3s var(--ease) both}
+.brow+.brow::before{content:"";position:absolute;top:0;right:var(--tx);left:calc(var(--tx) + 52px + var(--gap));height:1px;background:var(--line)}
+.brow:active{background:var(--on-soft)}
+.cv.th{width:52px;flex:none;border-radius:6px}
+.cv.th b,.cv.th i,.cv.th u{display:none}
+.cv em{position:absolute;inset:0;right:0;top:0;display:grid;place-items:center;font:500 20px/1 var(--font);font-style:normal;opacity:1}
+.get{position:relative;z-index:1;flex:none;height:32px;min-width:68px;padding-inline:14px;border-radius:16px;display:grid;place-items:center;background:var(--on-soft);font-size:14px;font-weight:500;font-variant-numeric:tabular-nums;transition:transform .14s var(--ease),background .2s}
+.get:active{transform:scale(.96)}
+.get.pri{background:var(--pri);color:var(--pri-on)}
+.get svg{width:16px;height:16px}
+/* the book page grows out of its row and folds back into it */
+.bpage{transform:none;transition:clip-path .42s var(--ease),visibility 0s .42s}
+.bpage.on{transition:clip-path .42s var(--ease)}
+.bpage .bscroll>*{animation:rise .4s var(--ease) .08s both}
+/* adding a book: the plus stretches into a line of status across the bar, then closes back */
+.ldock{transition:opacity .2s}
+.app.busy .ldock{opacity:0;pointer-events:none}
+.job{left:var(--gut);right:var(--gut);bottom:var(--tbb);max-width:none;transform:none;opacity:1;visibility:hidden;clip-path:inset(0 0 0 calc(100% - 52px) round 26px);transition:clip-path .4s var(--ease),visibility 0s .4s}
+.job.on{transform:none;visibility:visible;clip-path:inset(0 round 26px);transition:clip-path .4s var(--ease)}
+.job>span:first-of-type{flex:1}
+/* removing takes a held press: the bar fills while you hold and empties if you let go */
+.hold{position:relative;display:block;width:100%;height:var(--h-l);margin-top:72px;border-radius:26px;overflow:hidden;color:var(--danger);font-weight:500;box-shadow:inset 0 0 0 1px var(--line-2);touch-action:none;user-select:none;-webkit-user-select:none;transition:transform .14s var(--ease)}
+.hold i{position:absolute;inset:0;background:color-mix(in srgb,var(--danger) 24%,transparent);clip-path:inset(0 100% 0 0);transition:clip-path .2s ease-out}
+.hold.go{transform:scale(.98)}
+.hold.go i{clip-path:inset(0);transition:clip-path 1.1s linear}
+.hold span{position:relative}
+
+/* notes: the book's words in serif, yours in sans; one quiet line of actions */
+.note{padding:var(--pad)}
+.note .nq{margin:0;padding:0;font:400 18px/1.45 var(--serif);white-space:pre-wrap;overflow-wrap:break-word}
+.note ins{font-family:var(--font);font-size:.92em;text-decoration:none;background:var(--mark);border-radius:3px;padding:.1em .2em;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.nthought,.nadd{display:block;width:100%;margin-top:var(--gap);text-align:left;font-size:15px;line-height:1.45;white-space:pre-wrap;overflow-wrap:break-word}
+.nthought{padding-left:var(--gap);border-left:2px solid var(--ink-3);color:var(--ink)}
+.nadd{color:var(--ink-4);font-size:14px}
+.note textarea{display:block;width:100%;border:0;outline:0;background:none;resize:none;overflow:hidden;color:inherit;border-radius:0}
+.note textarea.nt{margin-top:var(--gap);padding-left:var(--gap);border-left:2px solid var(--ink-3);font:400 16px/1.45 var(--font)}
+.note textarea::placeholder{color:var(--ink-4)}
+.nfoot{display:flex;align-items:center;gap:4px;margin:var(--gap) -6px -6px 0}
+.nsrc{flex:1;min-width:0;display:flex;align-items:center;gap:4px;height:32px;text-align:left;font-size:14px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nsrc span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.nsrc svg{width:12px;height:12px;flex:none}
+.ni{min-width:32px;height:32px;padding-inline:8px;border-radius:16px;display:grid;place-items:center;font-size:14px;color:var(--ink-3);transition:background .2s,color .2s,transform .14s var(--ease)}
+.ni:active,.nsrc:active{transform:scale(.96)}
+.ni svg{width:16px;height:16px}
+.ni.ask{background:var(--on-soft);color:var(--danger)}
+
+/* ================= system =================
+   TYPE (iOS text styles, size/leading · weight · tracking for Inter)
+     large title 34/41 · 700 · -.022em      screen names
+     title 1     28/34 · 700 · -.021em      the book's name on its page
+     title 2     22/28 · 700 · -.018em      section names
+     headline    17/22 · 600 · -.013em      the label on a main button
+     body        17/22 · 400 · -.013em      names in lists, values, fields
+     subhead     15/20 · 400 · -.009em      second line in lists, thoughts, small buttons (600)
+     footnote    13/18 · 400 · -.003em      sources, hints, facts under titles; segmented labels (500)
+     caption     12/16 · 400 · 0            numbers of chapters, format marks
+   Regular reads; Semibold is pressed; Bold names a screen or a section; Medium only at 13 and below.
+   SPACE  4 · 8 · 12 · 16 · 20 · 24 · 32. Screen margin 16, content margin 20, reading margin 24. 32 above a section, 12 below its name.
+   RADIUS a control is a capsule (height / 2). A surface: sheet 28, card 24, cover 8.
+          Inside a surface: inner = outer − distance to the edge, never under 8. Capsules stay capsules.
+   TOUCH  nothing you press is under 44 × 44, even when it is drawn smaller.
+   MOTION feedback on press ≤150ms; a change of state 200–300ms; a new surface 360–420ms from where it came.
+          Nothing animates while you type, scroll or read. */
+:root{--tx:calc(var(--gut) + 4px);--r-card:24px;--r-ctl:20px;
+  --ls-34:-.022em;--ls-28:-.021em;--ls-22:-.018em;--ls-17:-.013em;--ls-15:-.009em;--ls-13:-.003em}
+body{font-size:17px;line-height:22px;letter-spacing:var(--ls-17)}
+/* large title */
+.lt{padding-inline:4px;margin:0 0 8px;font-size:34px;line-height:41px;font-weight:700;letter-spacing:var(--ls-34)}
+/* title 1 */
+.bp-t{margin-top:24px;font-size:28px;line-height:34px;font-weight:700;letter-spacing:var(--ls-28)}
+/* title 2: section names sit on the content line, not in the middle */
+.sec{margin:32px 0 12px;padding-inline:4px;text-align:left;font-size:22px;line-height:28px;font-weight:700;letter-spacing:var(--ls-22)}
+/* headline: main buttons */
+.pillb,.act,.hold,.ed-go{font-size:17px;line-height:22px;font-weight:600;letter-spacing:var(--ls-17)}
+/* body */
+.et b,.chr b,.facts,.search input,.bp-x,.toc button{font-size:17px;line-height:22px;font-weight:400;letter-spacing:var(--ls-17)}
+.bp-x{padding-inline:4px;line-height:24px}
+.facts{padding-inline:4px;gap:8px 12px}
+/* subhead */
+.et i,.bp-a,.nthought,.note textarea.nt,.cc i,.set label,.srow>span{font-size:15px;line-height:20px;letter-spacing:var(--ls-15)}
+.get,.round#aa{font-size:15px;font-weight:600;letter-spacing:var(--ls-15)}
+/* footnote */
+.bp-m,.nsrc,.nadd,.hint,.thead p,.ni,.job em{font-size:13px;line-height:18px;letter-spacing:var(--ls-13)}
+.seg button{font-size:13px;font-weight:500;letter-spacing:var(--ls-13)}
+.seg.big button{font-size:15px;letter-spacing:var(--ls-15)}
+/* caption */
+.chr span,.job b{font-size:12px;line-height:16px;letter-spacing:0}
+.chr span{line-height:22px}
+/* quotes keep the serif */
+.note .nq{font-size:17px;line-height:26px;letter-spacing:0}
+/* space */
+.search{margin-bottom:8px}
+.brow{padding:8px var(--tx);gap:12px}
+.brow+.brow::before{left:calc(var(--tx) + 52px + 12px);right:var(--tx)}
+.et i{margin-top:2px}
+.note{padding:20px;border-radius:var(--r-card)}
+.notes{gap:12px}
+.chr{padding:11px 4px}
+.chr+.chr::before{left:4px;right:4px}
+.bscroll>.rowb{margin-top:20px}
+.hold{margin-top:32px}
+.rscroll{padding-inline:24px}
+.set{gap:20px;padding:20px}
+/* radius */
+.cv,.cv.th,.cc .cv,.stage .cv{border-radius:8px}
+.bp-cv{border-radius:12px}
+.sheet{border-radius:28px}
+.sheet .toc button{border-radius:20px}
+.cc.q{border-radius:var(--r-card)}
+article .pick{border-radius:8px}
+/* touch: drawn small, pressed large */
+.ni{position:relative;min-width:44px;height:44px;margin:-6px -6px -6px 0}
+.nfoot{margin:12px -8px -8px 0;gap:0}
+.nsrc{height:44px;margin:-6px 0}
+.get{isolation:isolate}
+.get::after{content:"";position:absolute;inset:-6px -8px}
+.step button{width:44px;height:44px}
+/* motion: nothing moves while you type */
+.rows.q .brow{animation:none}
+
+/* ================= soft surfaces =================
+   Three levels: page → tray → cell. A tray groups; a cell is something you read or press.
+   Controls are rounded rectangles; a cell inside a tray takes the tray's radius minus the gap (24−6=18, 16−4=12).
+   One colour: highlighter yellow, only for what you kept. */
+:root{--bg:#151516;--tray:#1c1c1e;--cell:#262628;--bd:#ffffff12;--sh:0 1px 0 #00000059;--acc:#ffd60a;--mark:#ffd60a33;
+  --surf:var(--cell);--chrome:var(--tray);--pri:#f5f5f7;--pri-on:#151516;--ink:#f5f5f7;--ink-2:#d1d1d6;--ink-3:#98989f;--ink-4:#6c6c72;--on:var(--ink);--on-2:var(--ink-3);--light:#f5f5f7;--line:#ffffff12;--line-2:#ffffff1f}
+:root[data-read="light"]{--bg:#f1f1f4;--tray:#f8f8fa;--cell:#ffffff;--bd:#0000000f;--sh:0 1px 0 #00000014,0 1px 3px #0000000a;--acc:#b58a00;--mark:#ffd60a73;
+  --pri:#1c1c1e;--pri-on:#ffffff;--ink:#1c1c1e;--ink-2:#3a3a3c;--ink-3:#6e6e73;--ink-4:#a1a1a6;--light:#1c1c1e;--line:#0000000f;--line-2:#0000001a}
+:root[data-read="paper"]{--bg:#f2efe8;--tray:#f8f5ef;--cell:#fffdf8;--bd:#3c2f1a14;--sh:0 1px 0 #3c2f1a1f,0 1px 3px #3c2f1a0a;--acc:#b58a00;--mark:#ffd60a73;
+  --pri:#201d18;--pri-on:#fffdf8;--ink:#201d18;--ink-2:#3d3932;--ink-3:#757067;--ink-4:#a8a297;--light:#201d18;--line:#3c2f1a14;--line-2:#3c2f1a24}
+.lt,.sec,.bp-t{font-weight:600}
+/* cells */
+.search,.brow,.round,.rpill,.pillb.sub,.job,.chr,.cc.q,.toast,.pop,#add{background:var(--cell);box-shadow:inset 0 0 0 1px var(--bd),var(--sh)}
+/* trays */
+.note,.sheet,.facts,.seg{background:var(--tray);box-shadow:inset 0 0 0 1px var(--bd)}
+/* library */
+.search{height:44px;border-radius:14px;margin-bottom:0}
+.rows{margin:12px 0 0;display:flex;flex-direction:column;gap:6px}
+.brow{padding:8px 12px 8px 8px;border-radius:18px;transition:transform .14s var(--ease)}
+.brow:active{background:var(--cell);transform:scale(.985)}
+.brow+.brow::before{display:none}
+.cv.th{border-radius:10px}
+.get{border-radius:10px;background:var(--tray);box-shadow:inset 0 0 0 1px var(--bd)}
+.get.pri{background:var(--pri);box-shadow:none}
+/* segmented: the chosen option is a cell lifted out of the tray, and shows its icon */
+.seg{padding:4px;border-radius:12px;height:40px}
+.seg .th{top:4px;bottom:4px;border-radius:8px;background:var(--cell);box-shadow:inset 0 0 0 1px var(--bd),var(--sh)}
+.seg button{border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--ink-3)}
+.seg button[aria-pressed="true"]{color:var(--ink)}
+.seg button svg{width:0;height:16px;flex:none;opacity:0;transition:width .28s var(--ease),margin .28s var(--ease),opacity .2s}
+.seg button[aria-pressed="true"] svg{width:16px;margin-right:6px;opacity:1}
+.sheet .seg,.note .seg{background:var(--bg)}
+.seg.big{width:232px;height:48px;border-radius:16px}
+.seg.big .th,.seg.big button{border-radius:12px}
+#add,.round{width:48px;height:48px;border-radius:16px;color:var(--ink)}
+.job{height:48px;border-radius:16px;clip-path:inset(0 0 0 calc(100% - 48px) round 16px)}
+.job.on{clip-path:inset(0 round 16px)}
+.job b{border-radius:10px;background:var(--tray)}
+/* notes: the book's words in a cell, your thought and the source on the tray */
+.note{padding:6px;border-radius:24px}
+.note .nq{padding:14px;border-radius:18px;background:var(--cell);box-shadow:inset 0 0 0 1px var(--bd),var(--sh)}
+.nthought,.nadd,.note textarea.nt{margin:12px 14px 0;width:calc(100% - 28px)}
+.nfoot{margin:6px 0 0;padding-left:14px}
+.note ins{background:var(--mark)}
+/* buttons */
+.pillb,.act,.hold{height:48px;border-radius:14px}
+.pillb.sub{color:var(--ink)}
+.hold{background:var(--tray);box-shadow:inset 0 0 0 1px var(--bd)}
+/* book page */
+.bp-cv{border-radius:14px}
+.chr{padding:12px 14px;border-radius:14px;margin-bottom:6px}
+.chr+.chr::before{display:none}
+.facts{padding:16px 18px;border-radius:20px;gap:14px 12px}
+.cc.q{border-radius:18px}
+/* reader */
+.rdock{gap:6px}
+.rpill{height:48px;border-radius:16px;padding:6px 6px 6px 16px}
+.rpill span{border-radius:10px;height:36px;background:var(--tray);box-shadow:inset 0 0 0 1px var(--bd)}
+.reader.s-set #aa{background:var(--pri);color:var(--pri-on)}
+.sheet{border-radius:24px;clip-path:inset(100% 0 0 0 round 24px)}
+.reader.s-set #pset,.reader.s-toc #ptoc{clip-path:inset(0 round 24px)}
+.st{font-size:17px;line-height:22px;font-weight:600}
+.srow b{font-weight:400;font-variant-numeric:tabular-nums;color:var(--ink-3)}
+.toc button{border-radius:14px;padding:12px 14px}
+.toc button.now{background:var(--cell);box-shadow:inset 0 0 0 1px var(--bd),var(--sh)}
+.thead{border-bottom:1px dashed var(--line-2);padding-bottom:12px;margin-bottom:6px}
+.ruler i{border-radius:8px;background:var(--cell);border-color:var(--ink-3)}
+/* slider */
+.rng{-webkit-appearance:none;appearance:none;display:block;width:100%;height:28px;margin:8px 0 0;background:none}
+.rng::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(90deg,var(--ink) calc(var(--v,0)*100%),var(--bg) 0)}
+.rng::-moz-range-track{height:6px;border-radius:3px;background:linear-gradient(90deg,var(--ink) calc(var(--v,0)*100%),var(--bg) 0)}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;margin-top:-11px;border-radius:9px;background:var(--cell);box-shadow:inset 0 0 0 1px var(--line-2),var(--sh)}
+.rng::-moz-range-thumb{width:28px;height:28px;border:0;border-radius:9px;background:var(--cell);box-shadow:inset 0 0 0 1px var(--line-2),var(--sh)}
+/* picking a passage: it is marked, the rest of the page steps back, the menu opens beside it */
+article>*{transition:opacity .25s,background .2s,box-shadow .2s}
+.reader.pick article>*:not(.pick):not(.keep){opacity:.3}
+article .pick{background:var(--mark);box-shadow:0 0 0 6px var(--mark);border-radius:4px}
+article mark{background:var(--mark)}
+.pop{position:absolute;z-index:6;width:232px;padding:6px;border-radius:20px;box-shadow:inset 0 0 0 1px var(--bd),0 12px 32px var(--shade);opacity:0;transform:scale(.94) translateY(-4px);transform-origin:20% 0;pointer-events:none;transition:opacity .15s,transform .22s var(--ease),top .2s var(--ease)}
+.pop.on{opacity:1;transform:none;pointer-events:auto}
+.pop p{margin:0;padding:8px 12px 6px;font-size:13px;line-height:18px;color:var(--ink-3)}
+.pmenu button{display:flex;align-items:center;gap:10px;width:100%;height:44px;padding-inline:12px;border-radius:14px;text-align:left;color:var(--ink-2);transition:background .15s,color .15s}
+.pmenu button:active{background:var(--tray)}
+.pmenu svg{width:18px;height:18px;flex:none}
+#psave.ok{color:var(--acc)}
+#psave.ok svg{fill:currentColor}
+.pthink{display:none;padding:0 6px 6px}
+.pop.think .pmenu{display:none}
+.pop.think .pthink{display:block}
+.pthink textarea{display:block;width:100%;margin-bottom:8px;padding:10px 12px;border:0;outline:0;resize:none;border-radius:14px;background:var(--tray);box-shadow:inset 0 0 0 1px var(--bd);color:inherit;font:400 16px/22px var(--font)}
+.pthink .get{margin-left:auto;display:grid}
+/* a short word at the bottom when something is done */
+.toast{position:absolute;z-index:20;left:50%;bottom:calc(var(--tbb) + 64px);height:36px;padding:0 14px 0 10px;border-radius:12px;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;white-space:nowrap;opacity:0;transform:translate(-50%,8px) scale(.96);pointer-events:none;transition:opacity .2s,transform .25s var(--ease)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast svg{width:16px;height:16px}
+@media(hover:hover) and (pointer:fine){.pmenu button:hover,.toc button:hover{background:var(--tray)}.brow:hover .get:not(.pri){background:var(--bg)}}
+
+/* notes: search, filters, groups */
+.chips{display:flex;gap:6px;margin:8px calc(-1*var(--gut)) 0;padding:0 var(--gut) 4px;overflow-x:auto;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chipb{flex:none;max-width:220px;height:32px;padding-inline:12px;border-radius:10px;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--ink-3);background:var(--tray);box-shadow:inset 0 0 0 1px var(--bd);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .2s,color .2s,transform .14s var(--ease)}
+.chipb:active{transform:scale(.97)}
+.chipb i{font-style:normal;font-weight:400;opacity:.6;font-variant-numeric:tabular-nums}
+.chipb[aria-pressed="true"]{background:var(--cell);color:var(--ink);box-shadow:inset 0 0 0 1px var(--bd),var(--sh)}
+.notes{margin-top:8px}
+.ghead{margin:16px 0 0;padding-inline:14px;font-size:13px;line-height:18px;font-weight:500;color:var(--ink-3)}
+.ghead:first-child{margin-top:4px}
+.ntag{flex:none;height:24px;margin-right:8px;padding-inline:8px;border-radius:8px;display:grid;place-items:center;font-size:12px;font-weight:500;color:var(--ink-2);background:var(--bg)}
+.note input.ng{display:block;width:calc(100% - 28px);height:36px;margin:12px 14px 0;padding-inline:12px;border-radius:10px;outline:0;background:var(--bg);font-size:15px}
+.note input.ng::placeholder{color:var(--ink-4)}
+
+/* code bar and hidden items */
+.app.asking .ldock{opacity:0;pointer-events:none}
+.codebar{position:absolute;z-index:6;left:var(--gut);right:var(--gut);bottom:var(--tbb);height:48px;display:flex;align-items:center;gap:8px;padding:0 4px 0 16px;border-radius:16px;background:var(--cell);
+  visibility:hidden;clip-path:inset(0 0 0 calc(100% - 48px) round 16px);transition:clip-path .36s var(--ease),visibility 0s .36s}
+.codebar.on{visibility:visible;clip-path:inset(0 round 16px);transition:clip-path .36s var(--ease)}
+.codebar input{flex:1;min-width:0;outline:0;font-size:17px;letter-spacing:.2em}
+.codebar input::placeholder{letter-spacing:0;color:var(--ink-4)}
+.codebar.bad{animation:shake .32s var(--ease)}
+@keyframes shake{20%{transform:translateX(-7px)}45%{transform:translateX(6px)}70%{transform:translateX(-3px)}}
+.relock{position:absolute;z-index:2;top:28px;right:var(--gut);height:32px;padding:0 12px 0 10px;border-radius:10px;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-3);background:var(--cell)}
+.relock svg{width:16px;height:16px}
+.brow.lk .cv{background:var(--cell)!important;color:var(--ink-4)!important}
+.brow.lk .cv>*{display:none}
+.brow.lk .et b{color:var(--ink-3)}
+.get svg{width:16px;height:16px}
+.lockn{display:flex;align-items:center;gap:8px;width:100%;padding:16px 20px;color:var(--ink-3);font-size:15px;text-align:left}
+.lockn svg{width:16px;height:16px;flex:none}
+
+/* ================= light pass: flat, regular, quiet =================
+   No outlines and no shadows: a surface is told from the page only by a soft fill.
+   Titles are regular; medium is kept for what you press; nothing is bold. */
+:root{--bg:#212121;--tray:#282828;--cell:#2f2f2f;--bd:transparent;--sh:0 0 0 transparent;--ink:#ececec;--ink-2:#d0d0d0;--ink-3:#a0a0a0;--ink-4:#767676;--pri:#ececec;--pri-on:#212121;--light:#ececec;--line:#ffffff14;--line-2:#ffffff1f}
+:root[data-read="light"]{--bg:#ffffff;--tray:#f9f9f9;--cell:#f3f3f3;--bd:transparent;--sh:0 0 0 transparent;--ink:#0d0d0d;--ink-2:#333333;--ink-3:#6b6b6b;--ink-4:#a3a3a3;--pri:#0d0d0d;--pri-on:#ffffff;--light:#0d0d0d;--line:#0000000f;--line-2:#0000001a}
+:root[data-read="paper"]{--bg:#faf9f5;--tray:#f5f3ec;--cell:#efede5;--bd:transparent;--sh:0 0 0 transparent;--ink:#1f1e1b;--ink-2:#3d3b36;--ink-3:#73706a;--ink-4:#a8a59c;--pri:#1f1e1b;--pri-on:#faf9f5;--light:#1f1e1b;--line:#1f1e1b12;--line-2:#1f1e1b1f}
+body{font-size:16px;letter-spacing:-.011em}
+.lt{font-size:28px;line-height:34px;font-weight:400;letter-spacing:-.02em;margin-bottom:16px}
+.sec{margin:32px 0 8px;font-size:14px;line-height:20px;font-weight:400;letter-spacing:0;color:var(--ink-3)}
+.bp-t{font-size:22px;line-height:28px;font-weight:500;letter-spacing:-.015em}
+.pillb,.act,.hold{font-size:15px;font-weight:500;letter-spacing:-.005em;height:44px;border-radius:22px}
+.get{font-size:14px;font-weight:400;border-radius:16px;background:var(--cell)}
+.get.pri{font-weight:500}
+.st{font-weight:500;font-size:16px}
+.et b,.chr b,.facts,.bp-x,.toc button,.search input{font-size:16px;letter-spacing:-.011em}
+.et i{font-size:14px}
+.seg button,.seg.big button{font-weight:400;font-size:14px}
+.seg button[aria-pressed="true"]{font-weight:500}
+.cv b{font-weight:400}
+.chipb,.toast,.ghead,.ntag{font-weight:400}
+/* flat list: rows are not boxes; they only fill under the finger */
+.search{border-radius:22px;background:var(--cell)}
+.rows{gap:0;margin-top:8px}
+.brow{background:none;box-shadow:none;border-radius:12px;padding:8px}
+.brow:active{background:var(--tray);transform:none}
+.cv.th{border-radius:8px;width:44px}
+.seg.big,.seg.big .th,.seg.big button{border-radius:24px}
+.seg.big{height:44px;width:208px}
+#add,.round{width:44px;height:44px;border-radius:22px}
+.job,.codebar{height:44px;border-radius:22px}
+.job{clip-path:inset(0 0 0 calc(100% - 44px) round 22px)}
+.job.on,.codebar.on{clip-path:inset(0 round 22px)}
+.codebar{clip-path:inset(0 0 0 calc(100% - 44px) round 22px)}
+.rpill{height:44px;border-radius:22px}
+.rpill span{height:32px;border-radius:16px;background:var(--tray)}
+/* notes: no outer box; the quote is one soft block */
+.note{padding:0;background:none;border-radius:0}
+.note .nq{background:var(--tray);border-radius:18px;padding:16px}
+.nthought,.nadd,.note textarea.nt{margin:10px 16px 0;width:calc(100% - 32px)}
+.note input.ng{margin:10px 16px 0;width:calc(100% - 32px)}
+.nfoot{padding-left:16px;margin-top:2px}
+.notes{gap:20px}
+.chipb{border-radius:16px;background:none}
+.chipb[aria-pressed="true"]{background:var(--cell)}
+.lockn{background:var(--tray);border-radius:18px}
+/* book page */
+.chr{background:none;padding:12px 4px;border-radius:0;margin:0}
+.chr+.chr::before{display:block}
+.facts{background:none;padding:0 4px}
+.cc.q{background:var(--tray)}
+.pop{box-shadow:0 0 0 1px var(--line),0 12px 32px var(--shade)}
+.sheet{box-shadow:0 0 0 1px var(--line)}
+.toast{background:var(--pri);color:var(--pri-on);border-radius:18px}
+@media(hover:hover) and (pointer:fine){.brow:hover{background:var(--tray)}}
+
+/* scrubber and slider: one thin line, a filled part, a round handle */
+.ruler{height:28px;margin:14px 10px 2px;background:none}
+.ruler::before{content:"";position:absolute;left:0;right:0;top:12px;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--ink) calc(var(--p,0)*100%),var(--cell) 0)}
+.ruler u{top:10px;bottom:auto;width:2px;height:8px;margin-left:-1px;border-radius:1px;background:var(--ink-4)}
+.ruler i{top:6px;bottom:auto;width:16px;height:16px;margin-left:-8px;border:0;border-radius:50%;background:var(--ink);box-shadow:0 0 0 4px var(--tray)}
+.ruler:active i{transform:scale(1.2)}
+.ruler i{z-index:1}
+.thead{border-bottom:0;padding-bottom:4px}
+.thead p{margin-top:6px}
+.rng{height:24px}
+.rng::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(90deg,var(--ink) calc(var(--v,0)*100%),var(--cell) 0)}
+.rng::-moz-range-track{height:4px;border-radius:2px;background:linear-gradient(90deg,var(--ink) calc(var(--v,0)*100%),var(--cell) 0)}
+.rng::-webkit-slider-thumb{width:16px;height:16px;margin-top:-6px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 4px var(--tray)}
+.rng::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 4px var(--tray)}
+.sheet .seg{background:var(--cell)}
+.sheet .seg .th{background:var(--bg)}
+.toc button.now{background:var(--cell);box-shadow:none}
+.note.lockn{padding:14px 16px}
+
+/* the book page is a sheet over the list: rounded top, a handle, the list stepped back behind it */
+.bpage{inset:28px 0 0;border-radius:28px 28px 0 0;overflow:hidden;background:var(--tray);transition:clip-path .42s var(--ease),transform .32s var(--ease),visibility 0s .42s}
+.bpage.on{transition:clip-path .42s var(--ease),transform .32s var(--ease)}
+.bgrab{position:absolute;z-index:2;top:0;left:0;right:0;height:28px;touch-action:none;cursor:grab}
+.bgrab::before{content:"";position:absolute;top:8px;left:50%;width:36px;height:4px;margin-left:-18px;border-radius:2px;background:var(--line-2)}
+.bback{top:20px;z-index:3;background:var(--cell)}
+.bscroll{padding-top:76px}
+.scroll,.ldock{transition:transform .42s var(--ease),opacity .3s var(--ease)}
+.scroll{transform-origin:50% 0}
+.app.deep .scroll{transform:scale(.94);opacity:.4}
+.app.deep .ldock,.app.deep .relock{opacity:0;pointer-events:none}
+.bpage .pillb.sub,.bpage .get{background:var(--cell)}
+.bpage .cc.q{background:var(--cell)}
+.bgrab{display:block;width:100%;height:32px}
+.bscroll{padding-top:44px}
+
+/* hidden things live in one locked row at the end of the list */
+.hidrow{display:flex;align-items:center;gap:12px;width:100%;height:52px;margin-top:8px;padding:0 12px 0 20px;border-radius:12px;color:var(--ink-3);text-align:left;font-size:16px}
+.hidrow:active{background:var(--tray)}
+.hidrow span{flex:1}
+.hidrow svg{width:18px;height:18px;flex:none}
+.hidrow svg:last-child{width:12px;height:12px;color:var(--ink-4)}
+.notes .hidrow{margin-top:0;padding-left:16px}
+.relock{color:var(--ink);font-weight:500}
+.relock svg{display:none}
+.relock{padding-inline:14px;border-radius:16px}
+/* the two quiet actions at the foot of the book sheet sit together */
+.quiet{display:block;width:100%;height:44px;margin-top:32px;border-radius:22px;background:var(--cell);font-size:15px;font-weight:500}
+.quiet:active{transform:scale(.98)}
+.bpage .hold{margin-top:8px}
+
+/* whatever runs past an edge fades out instead of being cut */
+.chips,.car{-webkit-mask-image:linear-gradient(90deg,transparent,#000 16px,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(90deg,transparent,#000 16px,#000 calc(100% - 44px),transparent)}
+.ldock::before{content:"";position:absolute;z-index:-1;left:calc(-1*var(--gut));right:calc(-1*var(--gut));top:-28px;bottom:calc(-1*var(--tbb));background:linear-gradient(transparent,var(--bg) 62%);pointer-events:none}
+.bscroll{-webkit-mask-image:linear-gradient(#000 calc(100% - 40px),transparent);mask-image:linear-gradient(#000 calc(100% - 40px),transparent)}
+.toc{-webkit-mask-image:linear-gradient(#000 calc(100% - 28px),transparent);mask-image:linear-gradient(#000 calc(100% - 28px),transparent);padding-bottom:20px}
+#codeforgot{flex:none;white-space:nowrap;font-size:13px;color:var(--ink-3);margin:0;height:36px}
+#codeforgot.ask{color:var(--danger)}
+.seg button:focus-visible{outline:0}
+.seg button[aria-pressed="true"] svg{width:18px;height:18px}
+.pmenu svg{width:20px;height:20px}
+#psave.ok svg{fill:none}
+#psave.ok svg path:last-child{fill:currentColor}
+
+/* adding a book: a ring that fills, the file's name, and what is happening to it */
+.job{gap:10px;padding:0 16px 0 6px}
+.job>*{opacity:0;transition:opacity .15s}
+.job.on>*{opacity:1;transition:opacity .25s .18s}
+.jring{width:32px;height:32px;flex:none;display:grid}
+.jring svg{width:32px;height:32px;stroke-width:2}
+.jring .tr{stroke:var(--line-2);transition:fill .25s,stroke .25s}
+.jring .ar{stroke:var(--ink);stroke-dasharray:calc(var(--k,0)*100) 100;transition:stroke-dasharray .35s var(--ease),opacity .2s;transform-box:fill-box;transform-origin:center}
+.jring.spin .ar{stroke-dasharray:22 100;animation:jspin .9s linear infinite}
+@keyframes jspin{from{transform:rotate(-90deg)}to{transform:rotate(270deg)}}
+.jring .ck{stroke:var(--pri-on);stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .28s var(--ease) .12s}
+.jring .ex{stroke:var(--danger);opacity:0}
+.jring.ok svg{animation:jpop .4s var(--ease)}
+@keyframes jpop{0%{transform:scale(.8)}55%{transform:scale(1.12)}100%{transform:none}}
+.jring.ok .tr{fill:var(--pri);stroke:var(--pri)}
+.jring.ok .ar{opacity:0}
+.jring.ok .ck{stroke-dashoffset:0}
+.jring.bad .tr{stroke:var(--danger)}
+.jring.bad .ar{opacity:0}
+.jring.bad .ex{opacity:1}
+.jmain{flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;overflow:hidden}
+.jmain b{min-width:0;flex:0 1 auto;font-weight:400;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jmain i{flex:none;font-style:normal;font-size:14px;color:var(--ink-3);white-space:nowrap;font-variant-numeric:tabular-nums}
+.job.bad .jmain i{color:var(--danger)}
+.job.bad .jmain b{display:none}
+.job em{flex:none;font-size:13px;color:var(--ink-3)}
+.job>.jring{flex:none;display:grid;overflow:visible}
+.job>.jmain{flex:1;display:flex}
+.job .jmain b{height:auto;min-width:0;padding:0;border-radius:0;display:block;background:none;font-size:15px;line-height:20px}
+.job .jmain i{width:auto;height:auto;background:none;line-height:20px}
+.job>span.jmain{display:flex;flex:1;align-items:center}
+.job>span.jring{flex:none;display:grid}
+/* search */
+.search .ni{margin:0 -10px 0 0;flex:none;position:static}
+.rows .ghead{margin:20px 0 4px;padding-inline:8px}
+.rows .ghead:first-child{margin-top:8px}
+.gsub{margin:12px 0 0;padding-inline:8px;font-size:15px;line-height:20px;color:var(--ink)}
+.more{align-self:flex-start;height:32px;margin:2px 0 4px;padding-inline:8px;font-size:14px;color:var(--ink-3)}
+.more:not(:disabled):active{color:var(--ink)}
+.brow .et b.wrap{font-size:15px;line-height:21px;color:var(--ink-2)}
+.rows mark{background:var(--mark);color:var(--ink);padding:.05em .1em}
+.hidrow.ask{color:var(--danger)}
+@keyframes flash{0%,60%{background:var(--mark);box-shadow:0 0 0 6px var(--mark)}100%{background:transparent;box-shadow:0 0 0 6px transparent}}
+article .flash{animation:flash 1.8s var(--ease)}
+/* writing a thought: the menu widens into a calm field */
+.pop{transition:opacity .15s,transform .22s var(--ease),top .2s var(--ease),left .2s var(--ease),width .25s var(--ease)}
+.pop.think{width:min(320px,calc(100% - 24px))}
+.pthink{padding:0 6px 6px}
+.pthink textarea{margin:0;padding:12px 14px;border-radius:14px;background:var(--bg);box-shadow:none;font-size:16px;line-height:22px;overflow-y:auto;scrollbar-width:none}
+.pthink textarea::-webkit-scrollbar{display:none}
+.pthink textarea::placeholder{color:var(--ink-4)}
+.pfoot{display:flex;justify-content:flex-end;gap:6px;margin-top:8px}
+.pfoot .get{margin:0;min-width:0;height:36px;border-radius:18px;padding-inline:16px;display:grid}
+.pfoot .get:not(.pri){background:none;color:var(--ink-3)}
+
+/* v23 — bottom bar gathered in the centre; the status and code bars open over the same spot */
+.ldock{justify-content:center;gap:8px}
+.job,.codebar{--w:min(320px,calc(100% - 2*var(--gut)));--o:calc((var(--w) - 260px)/2);left:50%;right:auto;width:var(--w);margin-left:calc(var(--w)/-2)}
+.job,.codebar{clip-path:inset(0 var(--o) 0 calc(100% - var(--o) - 44px) round 22px)}
+/* remove: a calm button first, the hint and the fill come only with the press */
+.hold,.bpage .hold{height:44px;margin-top:8px;border-radius:22px;background:var(--cell);box-shadow:none;font-size:15px;font-weight:400;transition:transform .2s var(--ease)}
+.hold i{background:color-mix(in srgb,var(--danger) 22%,transparent)}
+.hold span{position:absolute;inset:0;display:grid;place-items:center;transition:opacity .2s,transform .3s var(--ease)}
+.hold .h2{opacity:0;transform:translateY(10px)}
+.hold.go .h1,.hold.tip .h1{opacity:0;transform:translateY(-10px)}
+.hold.go .h2,.hold.tip .h2{opacity:1;transform:none}
+.hold.tip{animation:nudge .36s var(--ease)}
+@keyframes nudge{30%{transform:translateX(-4px)}65%{transform:translateX(3px)}}
+@media (prefers-reduced-motion:reduce){.hold.tip{animation:none}}
+/* note editor: air between the quiet action and the main one */
+.nfoot{gap:12px}
+.nfoot .ni{margin:0;min-width:0;height:32px;padding-inline:4px}
+.nfoot .ni::after{content:"";position:absolute;inset:-6px}
+</style>
+
+<div class="app" id="app">
+  <div class="scroll" id="scroll">
+    <div class="view" id="v-home">
+      <h1 class="lt">Книги</h1>
+      <label class="search"><svg viewBox="0 0 18 18"><circle cx="8" cy="8" r="5"/><path d="M12 12l3.5 3.5"/></svg><input id="q" autocomplete="off" enterkeyhint="search" placeholder="Поиск по книгам и тексту" aria-label="Поиск"><button type="button" class="ni" id="qx" aria-label="Очистить" hidden><svg viewBox="0 0 18 18"><path d="M4.5 4.5l9 9M13.5 4.5l-9 9"/></svg></button></label>
+      <div class="rows" id="hlist"></div>
+    </div>
+    <div class="view" id="v-notes" hidden><h1 class="lt">Заметки</h1>
+      <label class="search" id="nsearch"><svg viewBox="0 0 18 18"><circle cx="8" cy="8" r="5"/><path d="M12 12l3.5 3.5"/></svg><input id="nq" autocomplete="off" enterkeyhint="search" placeholder="Поиск по заметкам" aria-label="Поиск по заметкам"></label>
+      <div class="chips" id="nchips"></div><datalist id="groups"></datalist>
+      <div class="notes" id="notes"></div></div>
+  </div>
+  <div class="job" id="job"><span class="jring spin" id="jstate"><svg viewBox="0 0 24 24"><circle class="tr" cx="12" cy="12" r="9"/><circle class="ar" cx="12" cy="12" r="9" pathLength="100" transform="rotate(-90 12 12)"/><path class="ck" d="M7.8 12.4l2.9 2.9 5.6-6.2" pathLength="1"/><path class="ex" d="M12 7.6v5.2M12 16.1v.2"/></svg></span><span class="jmain"><b id="jname"></b><i id="jtext"></i></span><em id="jcount" hidden></em></div>
+  <div class="ldock" id="ldock">
+    <div class="seg big" id="ltabs"></div>
+    <button class="round" id="add" aria-label="Добавить книгу"><svg viewBox="0 0 18 18"><path d="M9 3.5v11M3.5 9h11"/></svg></button>
+  </div>
+  <form class="codebar" id="codebar"><input id="code" type="password" inputmode="numeric" autocomplete="off" maxlength="12" aria-label="Код"><button class="get pri" id="codego">Открыть</button><button type="button" class="ni" id="codeforgot">Забыл код</button><button type="button" class="ni" id="codex" aria-label="Отмена"><svg viewBox="0 0 18 18"><path d="M4.5 4.5l9 9M13.5 4.5l-9 9"/></svg></button></form>
+  <button class="relock" id="relock" hidden><svg viewBox="0 0 18 18"><rect x="4" y="8" width="10" height="7" rx="2"/><path d="M6.5 8V6a2.5 2.5 0 015 0v2"/></svg><span>Готово</span></button>
+  <div class="toast" id="toast"><svg viewBox="0 0 18 18"><path d="M4 9.5l3.2 3.2L14 6"/></svg><span></span></div>
+  <input type="file" id="file" multiple hidden accept=".fb2,.epub,.pdf,.txt,.docx,.zip,application/pdf,application/epub+zip,text/plain">
+
+  <section class="bpage" id="bpage" aria-hidden="true">
+    <div class="bscroll" id="bbody"></div>
+    <button class="bgrab" id="bgrab" aria-label="Закрыть"></button>
+    <button class="round bback" id="bclose" hidden aria-label="Назад"><svg viewBox="0 0 18 18"><path d="M11 4L6 9l5 5"/></svg></button>
+  </section>
+
+  <section class="reader" id="reader" aria-hidden="true">
+    <div class="rscroll" id="rscroll"><article id="text"></article></div>
+    <div class="fade t"></div><div class="fade b"></div>
+    <div class="sheet" id="pset"><div class="set"><b class="st">Текст</b>
+      <div><div class="srow"><span>Размер</span><b id="fval"></b></div><input type="range" class="rng" id="fsize" min="15" max="28" step="1" aria-label="Размер шрифта"></div>
+      <div><label>Шрифт</label><div class="seg" id="fonts"></div></div>
+      <div><label>Насыщенность</label><div class="seg" id="weights"></div></div>
+      <div><label>Фон</label><div class="seg" id="themes"></div></div>
+      <div><label>Фокус</label><div class="seg" id="focus"></div></div>
+    </div></div>
+    <div class="sheet" id="ptoc"><div class="thead"><div class="seg" id="ttabs"></div><div class="ruler" id="ruler"><i></i></div><p id="tleft"></p></div><div class="toc" id="toc"></div><div class="toc" id="bnotes" hidden></div></div>
+    <div class="rdock" id="rdock">
+      <button class="round" id="back" aria-label="К списку книг"><svg viewBox="0 0 18 18"><path d="M11 4L6 9l5 5"/></svg></button>
+      <button class="rpill" id="info" aria-label="Оглавление и заметки"><svg viewBox="0 0 16 16"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h7"/></svg><b id="rname"></b><span id="rchip"></span></button>
+      <button class="round" id="aa" aria-label="Настройки чтения">Аа</button>
+    </div>
+    <div class="pop" id="pop">
+      <p>Действия</p>
+      <div class="pmenu"><button id="psave"><svg viewBox="0 0 24 24" stroke-width="1.5"><path d="M9.25 9.05c1.78.65 3.72.65 5.5 0"/><path d="M16.82 2H7.18C5.05 2 3.32 3.74 3.32 5.86v14.09c0 1.8 1.29 2.56 2.87 1.69l4.88-2.71c.52-.29 1.36-.29 1.87 0l4.88 2.71c1.58.88 2.87.12 2.87-1.69V5.86C20.68 3.74 18.95 2 16.82 2z"/></svg><span>Сохранить</span></button><button id="pcopy"><svg viewBox="0 0 18 18"><rect x="6" y="6" width="9" height="9" rx="2"/><path d="M12 6V4.5A1.5 1.5 0 0010.5 3h-6A1.5 1.5 0 003 4.5v6A1.5 1.5 0 004.5 12H6"/></svg><span>Копировать</span></button><button id="pthink"><svg viewBox="0 0 18 18"><path d="M3 15l1-4 8-8 3 3-8 8z"/></svg><span>Добавить мысль</span></button></div>
+      <div class="pthink"><textarea id="ptext" rows="1" spellcheck="false" placeholder="Что вы об этом думаете" aria-label="Ваша мысль"></textarea><div class="pfoot"><button class="get" id="pback">Отмена</button><button class="get pri" id="pdone">Готово</button></div></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const el=(t,c,txt)=>{const e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e};
+const still=matchMedia('(prefers-reduced-motion:reduce)').matches;
+const app=$('app'),list=$('list'),reader=$('reader'),rscroll=$('rscroll'),text=$('text'),job=$('job');
+const WPM=170; /* a calm reading pace, used for "time left" */
+let books=[],cur=null;
+
+/* ---------- storage: books on this device ---------- */
+let db=null;
+function idbOpen(){return new Promise(res=>{try{const r=indexedDB.open('chitalka',1);
+  r.onupgradeneeded=()=>r.result.createObjectStore('books',{keyPath:'id'});
+  r.onsuccess=()=>{db=r.result;res()};r.onerror=()=>res()}catch(e){res()}})}
+function idb(mode,fn){return new Promise(res=>{if(!db)return res(null);try{const t=db.transaction('books',mode);const q=fn(t.objectStore('books'));
+  t.oncomplete=()=>res(q&&q.result);t.onerror=()=>res(null)}catch(e){res(null)}})}
+const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+
+/* ---------- zip without a library: the browser inflates each entry itself ---------- */
+async function unzip(buf){
+  const u=new Uint8Array(buf),dv=new DataView(buf);let e=u.length-22;
+  while(e>=0&&dv.getUint32(e,true)!==0x06054b50)e--;
+  if(e<0)throw new Error('bad');
+  const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const dec=new TextDecoder(),files=new Map();
+  for(let i=0;i<n;i++){
+    if(dv.getUint32(p,true)!==0x02014b50)break;
+    const method=dv.getUint16(p+10,true),csize=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),off=dv.getUint32(p+42,true);
+    files.set(dec.decode(u.subarray(p+46,p+46+nl)),{method,csize,off});p+=46+nl+xl+cl;
+  }
+  return {names:[...files.keys()],has:n=>files.has(n),
+    async get(name){const f=files.get(name);if(!f)return null;
+      const start=f.off+30+dv.getUint16(f.off+26,true)+dv.getUint16(f.off+28,true),raw=u.subarray(start,start+f.csize);
+      if(f.method===0)return raw;
+      if(f.method!==8||typeof DecompressionStream==='undefined')throw new Error('bad');
+      return new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer())}};
+}
+function decode(bytes){
+  const head=new TextDecoder('latin1').decode(bytes.subarray(0,200)),m=head.match(/encoding=["']([\w-]+)["']/i);
+  if(m){try{return new TextDecoder(m[1]).decode(bytes)}catch(e){}}
+  try{return new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch(e){return new TextDecoder('windows-1251').decode(bytes)}
+}
+/* covers: taken from the file when it has one, scaled down for storage */
+function shrink(src){return new Promise(res=>{const im=new Image();im.onerror=()=>res(null);im.onload=()=>{try{const k=Math.min(1,420/im.naturalWidth),c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.naturalWidth*k));c.height=Math.max(1,Math.round(im.naturalHeight*k));c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',.82))}catch(e){res(null)}};im.src=src})}
+const clean=s=>s.replace(/­/g,'').replace(/[ \t ]+/g,' ').trim();
+const noExt=n=>n.replace(/\.[^.]+$/,'').replace(/[_]+/g,' ').trim();
+
+/* ---------- formats that already know their paragraphs ---------- */
+function parseFb2(xml,name){
+  const doc=new DOMParser().parseFromString(xml,'application/xml');
+  if(doc.querySelector('parsererror')&&!doc.querySelector('body'))throw new Error('bad');
+  const ti=doc.querySelector('title-info'),q=(s)=>ti&&ti.querySelector(s)?clean(ti.querySelector(s).textContent):'';
+  const author=[q('author first-name'),q('author last-name')].filter(Boolean).join(' ');
+  const blocks=[];
+  const walk=n=>{
+    for(const c of n.children){
+      const t=c.localName;
+      if(t==='title'){const s=clean([...c.querySelectorAll('p')].map(p=>p.textContent).join('. ')||c.textContent);if(s)blocks.push(['h',s])}
+      else if(t==='p'){c.querySelectorAll('a[type="note"]').forEach(a=>a.remove());const s=clean(c.textContent);if(s)blocks.push(['p',s])}
+      else if(t==='subtitle'){const s=clean(c.textContent);if(s)blocks.push(['s',s])}
+      else if(t==='poem'||t==='cite'||t==='epigraph'){const ls=[...c.querySelectorAll('v,p,text-author')].map(v=>clean(v.textContent)).filter(Boolean);if(ls.length)blocks.push(['q',ls.join('\n')])}
+      else if(t==='section'||t==='body')walk(c);
+    }
+  };
+  const bodies=[...doc.querySelectorAll('body')].filter(b=>!/note|comment/i.test(b.getAttribute('name')||''));
+  bodies.forEach(walk);
+  let rawCover=null;try{const im=doc.querySelector('coverpage image'),h=im&&[...im.attributes].find(a=>a.localName==='href'),id=h&&h.value.replace(/^#/,''),bin=id&&[...doc.getElementsByTagName('binary')].find(x=>x.getAttribute('id')===id);
+    if(bin)rawCover='data:'+(bin.getAttribute('content-type')||'image/jpeg')+';base64,'+bin.textContent.replace(/\s+/g,'')}catch(e){}
+  return {title:q('book-title')||noExt(name),author,lang:q('lang')||'ru',blocks,rawCover};
+}
+const BLOCK=new Set(['p','div','li','blockquote','h1','h2','h3','h4','h5','h6','section','article','body','ul','ol','table','tr','td','th','dd','dt','dl','pre','figure','figcaption','aside','header','footer','main','nav','hr','br']);
+function htmlBlocks(root,out){
+  const walk=n=>{
+    const t=n.localName;
+    if(t==='script'||t==='style'||t==='nav'||t==='head')return;
+    if(/^h[1-6]$/.test(t)){const s=clean(n.textContent);if(s)out.push(['h',s]);return}
+    const kids=[...n.children],hasBlock=kids.some(k=>BLOCK.has(k.localName)&&k.localName!=='br');
+    if(!hasBlock){
+      if(kids.some(k=>k.localName==='br')){
+        let buf='';const flush=()=>{const s=clean(buf);if(s)out.push(['p',s]);buf=''};
+        n.childNodes.forEach(c=>{if(c.nodeType===1&&c.localName==='br')flush();else buf+=c.textContent});flush();
+      }else{const s=clean(n.textContent);if(s)out.push([t==='blockquote'?'q':'p',s])}
+      return;
+    }
+    n.childNodes.forEach(c=>{if(c.nodeType===1)walk(c);else if(c.nodeType===3){const s=clean(c.textContent);if(s)out.push(['p',s])}});
+  };
+  walk(root);
+}
+async function parseEpub(z,name){
+  const xml=async p=>new DOMParser().parseFromString(decode(await z.get(p)),'application/xml');
+  const c=await xml('META-INF/container.xml'),opfPath=c.querySelector('rootfile').getAttribute('full-path'),opf=await xml(opfPath);
+  const base=opfPath.includes('/')?opfPath.slice(0,opfPath.lastIndexOf('/')+1):'';
+  const meta=t=>{const e=[...opf.getElementsByTagName('*')].find(x=>x.localName===t);return e?clean(e.textContent):''};
+  const items={};[...opf.getElementsByTagName('*')].filter(x=>x.localName==='item').forEach(i=>items[i.getAttribute('id')]=i);
+  const blocks=[];
+  for(const r of [...opf.getElementsByTagName('*')].filter(x=>x.localName==='itemref')){
+    const it=items[r.getAttribute('idref')];if(!it||/nav/.test(it.getAttribute('properties')||''))continue;
+    let path=base+decodeURIComponent(it.getAttribute('href').split('#')[0]);
+    const parts=[];path.split('/').forEach(s=>{if(s==='..')parts.pop();else if(s!=='.')parts.push(s)});path=parts.join('/');
+    const bytes=await z.get(path);if(!bytes)continue;
+    const src=decode(bytes);let d=new DOMParser().parseFromString(src,'application/xhtml+xml');
+    if(d.querySelector('parsererror')||!d.body)d=new DOMParser().parseFromString(src,'text/html');
+    if(d.body)htmlBlocks(d.body,blocks);
+  }
+  let rawCover=null;try{const all=Object.values(items),mc=[...opf.getElementsByTagName('*')].find(x=>x.localName==='meta'&&x.getAttribute('name')==='cover');
+    const ci=all.find(i=>/cover-image/.test(i.getAttribute('properties')||''))||(mc&&items[mc.getAttribute('content')])||all.find(i=>/^image\//.test(i.getAttribute('media-type')||'')&&/cover/i.test(i.getAttribute('id')+i.getAttribute('href')));
+    if(ci){const parts=[];(base+decodeURIComponent(ci.getAttribute('href'))).split('/').forEach(s=>{if(s==='..')parts.pop();else if(s!=='.')parts.push(s)});const by=await z.get(parts.join('/'));
+      if(by)rawCover=URL.createObjectURL(new Blob([by],{type:ci.getAttribute('media-type')||'image/jpeg'}))}}catch(e){}
+  return {title:meta('title')||noExt(name),author:meta('creator'),lang:(meta('language')||'ru').slice(0,2),blocks,rawCover};
+}
+async function parseDocx(z,name){
+  const d=new DOMParser().parseFromString(decode(await z.get('word/document.xml')),'application/xml'),blocks=[];
+  for(const p of [...d.getElementsByTagName('*')].filter(x=>x.localName==='p')){
+    const s=clean([...p.getElementsByTagName('*')].filter(x=>x.localName==='t'||x.localName==='tab'||x.localName==='br').map(x=>x.localName==='t'?x.textContent:' ').join(''));
+    if(!s)continue;
+    const st=[...p.getElementsByTagName('*')].find(x=>x.localName==='pStyle'),v=st?(st.getAttribute('w:val')||''):'';
+    blocks.push([/^(heading|title|заголовок|\d$)/i.test(v)?'h':'p',s]);
+  }
+  return {title:noExt(name),author:'',lang:'ru',blocks};
+}
+const HEADLINE=/^(глава|часть|книга|том|раздел|эпилог|пролог|предисловие|послесловие|введение|заключение|chapter|part|book|prologue|epilogue)(?![a-zа-яё])/i;
+function parseTxt(s,name){
+  s=s.replace(/\r\n?/g,'\n');const lines=s.split('\n');let paras=s.split(/\n[ \t]*\n+/);
+  if(paras.length<lines.length/12)paras=lines; /* no blank lines between paragraphs: one line is one paragraph */
+  else paras=paras.map(p=>p.split('\n').map(l=>l.trim()).reduce((a,l)=>a&&/[-­]$/.test(a)&&/^[a-zа-яё]/.test(l)?a.slice(0,-1)+l:a?a+' '+l:l,''));
+  const blocks=[];for(const p of paras){const t=clean(p);if(!t)continue;blocks.push([t.length<70&&(HEADLINE.test(t)||(t.length>3&&t===t.toUpperCase()&&/[A-ZА-ЯЁ]/.test(t)))?'h':'p',t])}
+  return {title:noExt(name),author:'',lang:'ru',blocks};
+}
+
+/* ---------- PDF: letters with coordinates, paragraphs are rebuilt by layout ---------- */
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('net'));document.head.appendChild(s)})}
+let pdfP=null;
+function loadPdf(){
+  return pdfP||(pdfP=(async()=>{
+    const base='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+    await loadScript(base+'pdf.min.js');if(window.pdfjsLibReady)await window.pdfjsLibReady;
+    const lib=window.pdfjsLib;if(!lib)throw new Error('net');
+    if(!lib.GlobalWorkerOptions.workerSrc)lib.GlobalWorkerOptions.workerSrc=base+'pdf.worker.min.js';
+    return lib})().catch(e=>{pdfP=null;throw e}));
+}
+function toLines(items,H){
+  const it=[];
+  for(const i of items){if(!i.str)continue;const tr=i.transform;if(Math.abs(tr[1])>.01||Math.abs(tr[2])>.01)continue; /* rotated text is decoration */
+    const h=i.height||Math.abs(tr[3]);it.push({s:i.str,x:tr[4],y:H-tr[5],w:i.width,h})}
+  it.sort((a,b)=>a.y-b.y||a.x-b.x);
+  const lines=[];
+  for(const i of it){
+    const l=lines[lines.length-1];
+    if(l&&Math.abs(i.y-l.y)<Math.max(i.h,l.h)*.5)l.items.push(i);else lines.push({y:i.y,h:i.h,items:[i]});
+  }
+  return lines.map(l=>{
+    l.items.sort((a,b)=>a.x-b.x);let s='',end=null,hs=[];
+    const mh=Math.max(...l.items.map(i=>i.h));
+    for(const i of l.items){
+      if(/^\s*\d{1,3}\s*$/.test(i.s)&&i.h<mh*.8)continue; /* a raised footnote number */
+      if(end!=null&&i.x-end>i.h*.22&&!/\s$/.test(s)&&!/^\s/.test(i.s))s+=' ';
+      s+=i.s;end=i.x+i.w;if(i.s.trim())hs.push(i.h);
+    }
+    hs.sort((a,b)=>a-b);const first=l.items.find(i=>i.s.trim())||l.items[0];
+    return {s:s.replace(/\s+/g,' ').trim(),x0:first.x,x1:end,y:l.y,h:hs[hs.length>>1]||l.h};
+  }).filter(l=>l.s);
+}
+const mode=(arr,round)=>{const m=new Map();let best=null,bn=0;for(const [v,w] of arr){const k=Math.round(v/round)*round,n=(m.get(k)||0)+w;m.set(k,n);if(n>bn){bn=n;best=k}}return best};
+const median=a=>{if(!a.length)return 0;const s=[...a].sort((x,y)=>x-y);return s[s.length>>1]};
+const ENDS=/[.!?…:;»”"')\]]$/;
+function reflow(pages){
+  const all=pages.flatMap(p=>p.lines);
+  const chars=all.reduce((n,l)=>n+l.s.length,0);
+  if(chars/Math.max(1,pages.length)<40)throw new Error('scan');
+  const body=mode(all.map(l=>[l.h,l.s.length]),.5)||10;
+  /* running heads, feet and page numbers: the same thing in the same margin on many pages */
+  const keyOf=l=>l.s.replace(/\d+/g,'#').toLowerCase(),inMargin=(l,p)=>l.y<p.h*.09||l.y>p.h*.92,seen=new Map();
+  pages.forEach(p=>p.lines.forEach(l=>{if(inMargin(l,p))seen.set(keyOf(l),(seen.get(keyOf(l))||0)+1)}));
+  const repeat=Math.max(3,pages.length*.3);
+  const blocks=[];let cur=null,curEnd=null,prevHead=false,kind='p';
+  const flush=()=>{if(cur){blocks.push([kind,cur]);cur=null}kind='p'};
+  const join=(a,b)=>/[-­]$/.test(a)&&/^[a-zа-яё]/.test(b)?a.slice(0,-1)+b:a+' '+b;
+  for(const p of pages){
+    let lines=p.lines.filter(l=>!(inMargin(l,p)&&(seen.get(keyOf(l))>=repeat||/^[\s\-–—]*\d{1,4}[\s\-–—]*$/.test(l.s))));
+    if(!lines.length)continue;
+    {let k=lines.length;while(k>0&&lines[k-1].h<body*.9)k--; /* small type at the foot of a page is a footnote: left out */
+      if(k>0&&k<lines.length&&lines[k-1].y>p.h*.3)lines=lines.slice(0,k)}
+    const bl=lines.filter(l=>Math.abs(l.h-body)<=body*.12);
+    const L=mode((bl.length?bl:lines).map(l=>[l.x0,1]),1),xs=(bl.length?bl:lines).map(l=>l.x1).sort((a,b)=>a-b),R=xs[Math.floor(xs.length*.95)]||xs[xs.length-1],W=Math.max(1,R-L);
+    const gaps=[];for(let i=1;i<bl.length;i++){const g=bl[i].y-bl[i-1].y;if(g>0&&g<body*3)gaps.push(g)}
+    const gap=median(gaps)||body*1.3,W0=Math.max(W,p.w-2*L),short=x=>x<L+W0*.78;
+    lines.forEach((l,i)=>{
+      const prev=i?lines[i-1]:null,centered=Math.abs((l.x0+l.x1)/2-(L+R)/2)<W*.06&&l.x1-l.x0<W*.7;
+      const isHead=l.s.length<120&&(l.h>body*1.18||(centered&&HEADLINE.test(l.s)));
+      if(isHead){
+        flush();const last=blocks[blocks.length-1];
+        if(prevHead&&last&&last[0]==='h'&&prev&&l.y-prev.y<l.h*2.2)last[1]+=' '+l.s;else blocks.push(['h',l.s]);
+        prevHead=true;curEnd=null;return;
+      }
+      if(centered&&/^[*·•\s—–-]{1,9}$/.test(l.s)){flush();blocks.push(['s','* * *']);prevHead=false;return}
+      if(/^[IVXLC]{1,7}\.?$/.test(l.s)){flush();blocks.push(['s',l.s]);prevHead=false;curEnd=null;return} /* a stanza number */
+      const indent=l.x0-L>body*.9&&l.x0-L<W*.3,jump=prev?l.y-prev.y>gap*1.5:false;
+      const shortPrev=curEnd!=null&&curEnd<R-W*.18&&ENDS.test(cur||'');
+      /* a new page keeps the paragraph going unless the layout says otherwise */
+      /* two short lines in a row with no gap and no indent are verse: the line break is kept */
+      const verse=!!cur&&!prevHead&&!!prev&&!jump&&!indent&&curEnd!=null&&short(curEnd)&&short(l.x1);
+      const fresh=!verse&&(!cur||prevHead||indent||(prev?jump:false)||shortPrev||(!prev&&ENDS.test(cur)&&!/^[a-zа-яё]/.test(l.s)));
+      if(verse){cur+='\n'+l.s;kind='v'}else if(fresh){flush();cur=l.s}else cur=join(cur,l.s);
+      curEnd=l.x1;prevHead=false;
+    });
+  }
+  flush();return blocks;
+}
+async function parsePdf(buf,name,onp){
+  const lib=await loadPdf(),doc=await lib.getDocument({data:new Uint8Array(buf)}).promise,pages=[];
+  for(let i=1;i<=doc.numPages;i++){
+    const pg=await doc.getPage(i),vp=pg.getViewport({scale:1}),tc=await pg.getTextContent();
+    pages.push({w:vp.width,h:vp.height,lines:toLines(tc.items,vp.height)});onp(i,doc.numPages);
+    if(pg.cleanup)pg.cleanup();
+  }
+  let title='',author='';try{const m=await doc.getMetadata();title=clean(m.info.Title||'');author=clean(m.info.Author||'')}catch(e){}
+  let rawCover=null;try{const pg=await doc.getPage(1),v=pg.getViewport({scale:1}),vp=pg.getViewport({scale:360/v.width}),c=document.createElement('canvas');c.width=Math.round(vp.width);c.height=Math.round(vp.height);
+    await pg.render({canvasContext:c.getContext('2d'),viewport:vp,canvas:c}).promise;rawCover=c.toDataURL('image/jpeg',.82)}catch(e){}
+  const blocks=reflow(pages);try{doc.destroy()}catch(e){}
+  return {title:title&&!/^(untitled|microsoft word)/i.test(title)?title:noExt(name),author,lang:'ru',blocks,pages:pages.length,rawCover};
+}
+
+/* ---------- import ---------- */
+let jobT=0,busy=false;
+const ringSvg=(p,cls)=>'<svg class="ring '+(cls||'')+'" viewBox="0 0 20 20"><circle class="tr" cx="10" cy="10" r="8"/><circle class="ar" cx="10" cy="10" r="8" pathLength="100" stroke-dasharray="'+p*100+' 100" transform="rotate(-90 10 10)"/></svg>';
+const okSvg='<svg class="ring ok" viewBox="0 0 20 20"><path d="M4.5 10.5l3.6 3.6L15.5 6.5"/></svg>',badSvg='<svg class="ring bad" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8"/><path d="M10 6v5M10 13.8v.2"/></svg>';
+/* the tracker: format, what is happening, place in the queue, state mark */
+let jPrev='',jNext='';
+function say(msg,k,st){
+  clearTimeout(jobT);app.classList.add('busy');job.className='job on'+(st===true?' bad':'');
+  const r=$('jstate'),t=$('jtext'),pg=/^Страница/;
+  r.className='jring '+(st===true?'bad':st==='ok'?'ok':k?'':'spin');r.style.setProperty('--k',k||0);
+  jNext=msg;
+  if(msg!==jPrev){
+    /* page numbers tick in place; a change of stage slides the old word up and the new one in */
+    if((pg.test(msg)&&pg.test(jPrev))||still||!t.animate||!jPrev)t.textContent=msg;
+    else t.animate([{opacity:1,transform:'none'},{opacity:0,transform:'translateY(-6px)'}],{duration:100,easing:'ease-in'}).onfinish=()=>{t.textContent=jNext;t.animate([{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}],{duration:220,easing:'cubic-bezier(.22,1,.36,1)'})};
+  }
+  jPrev=msg;
+}
+function hush(ms){clearTimeout(jobT);jobT=setTimeout(()=>{job.classList.remove('on');app.classList.remove('busy')},ms)}
+async function read(file){
+  const name=file.name,ext=(name.split('.').pop()||'').toLowerCase(),buf=await file.arrayBuffer(),u=new Uint8Array(buf);
+  const isPdf=u[0]===0x25&&u[1]===0x50&&u[2]===0x44&&u[3]===0x46,isZip=u[0]===0x50&&u[1]===0x4b;
+  let b,fmt;
+  if(isPdf){fmt='pdf';b=await parsePdf(buf,name,(i,n)=>say('Страница '+i+' из '+n,i/n))}
+  else if(isZip){
+    const z=await unzip(buf),fb=z.names.find(n=>/\.fb2$/i.test(n));
+    if(z.has('META-INF/container.xml')){fmt='epub';b=await parseEpub(z,name)}
+    else if(z.has('word/document.xml')){fmt='docx';b=await parseDocx(z,name)}
+    else if(fb){fmt='fb2';b=parseFb2(decode(await z.get(fb)),fb)}
+    else throw new Error('kind');
+  }
+  else if(ext==='fb2'||/^\s*<\?xml[\s\S]{0,300}<FictionBook/i.test(new TextDecoder('latin1').decode(u.subarray(0,600)))){fmt='fb2';b=parseFb2(decode(u),name)}
+  else if(ext==='txt'||file.type==='text/plain'){fmt='txt';b=parseTxt(decode(u),name)}
+  else throw new Error('kind');
+  if(!b.blocks.length)throw new Error(fmt==='pdf'?'scan':'bad');
+  {const low=x=>(x||'').toLowerCase().replace(/[^a-zа-яё0-9]+/g,' ').trim(),T=low(b.title),A=low(b.author); /* the book's own title page repeats the title and the author */
+    while(b.blocks.length>1&&b.blocks[0][0]==='h'){const h=low(b.blocks[0][1]);if(h===T||(A&&(h===A||A.includes(h)||h===A+' '+T||h===T+' '+A)))b.blocks.shift();else break}}
+  if(b.rawCover)b.cover=await shrink(b.rawCover);delete b.rawCover;
+  b.words=b.blocks.reduce((n,x)=>n+x[1].split(/\s+/).length,0);
+  return Object.assign(b,{id:'b'+Date.now()+Math.random().toString(36).slice(2,6),fmt,date:Date.now()});
+}
+const WHY={scan:'В файле нет текста · это скан',kind:'Этот формат пока не читается',net:'Нет связи · модуль PDF не загрузился',bad:'Не удалось прочитать файл'};
+async function addFiles(files){
+  if(busy)return;busy=true;let last=null,err=null,dupN=0;
+  for(const [n,f] of files.entries()){
+    $('jname').textContent=f.name;jPrev='';$('jcount').hidden=files.length<2;$('jcount').textContent=(n+1)+' / '+files.length;
+    say('Открываю',0);
+    try{const b=await read(f),dup=books.find(x=>!x.sample&&x.title===b.title&&x.words===b.words);if(dup){last=dup;dupN++}else{books.push(b);idb('readwrite',s=>s.put(b));last=b}}
+    catch(e){err=WHY[e.message]||WHY.bad}
+  }
+  busy=false;go('home');
+  if(err){say(err,0,true);hush(3200)}else{say(dupN===files.length?'Уже есть в книгах':files.length>1?'Добавлено · '+(files.length-dupN):'Готово',1,'ok');hush(1100)}
+  if(last&&files.length===1&&!err)setTimeout(()=>openBook(last),still?0:350);
+}
+$('add').onclick=()=>{if(!busy)$('file').click()};
+$('file').onchange=e=>{const f=[...e.target.files];e.target.value='';if(f.length)addFiles(f)};
+app.addEventListener('dragover',e=>{e.preventDefault();app.classList.add('drag')});
+app.addEventListener('dragleave',()=>app.classList.remove('drag'));
+app.addEventListener('drop',e=>{e.preventDefault();app.classList.remove('drag');const f=[...e.dataTransfer.files];if(f.length)addFiles(f)});
+
+/* ---------- pieces shared by both tabs ---------- */
+const IC={copy:'<svg viewBox="0 0 18 18"><rect x="6" y="6" width="9" height="9" rx="2"/><path d="M12 6V4.5A1.5 1.5 0 0010.5 3h-6A1.5 1.5 0 003 4.5v6A1.5 1.5 0 004.5 12H6"/></svg>',
+  x:'<svg viewBox="0 0 18 18"><path d="M4.5 4.5l9 9M13.5 4.5l-9 9"/></svg>',ok:'<svg viewBox="0 0 18 18"><path d="M4 9.5l3.2 3.2L14 6"/></svg>'};
+const mins=m=>m<1?'меньше минуты':m<60?Math.round(m)+' мин':Math.floor(m/60)+' ч'+(Math.round(m%60)?' '+Math.round(m%60)+' мин':'');
+const posOf=b=>ls.get('pos-'+b.id,{i:0,f:0,p:0});
+function copyText(t,ok){
+  const plan=()=>{try{const a=el('textarea');a.value=t;a.setAttribute('readonly','');a.style.cssText='position:fixed;top:0;opacity:0';document.body.appendChild(a);a.select();const r=document.execCommand('copy');a.remove();if(r)ok()}catch(e){}};
+  try{navigator.clipboard.writeText(t).then(ok,plan)}catch(e){plan()}
+}
+/* segmented choices, built once; the marker is placed from the pressed button */
+const segs=[];
+function seg(id,labels,get,set,after,fonts){
+  const box=$(id),th=el('i','th');box.appendChild(th);
+  const place=()=>{const i=get(),b=box.children[i+1];th.style.left=b.offsetLeft+'px';th.style.right=(box.clientWidth-b.offsetLeft-b.offsetWidth)+'px';
+    [...box.children].forEach((c,n)=>n&&c.setAttribute('aria-pressed',String(n-1===i)))};
+  labels.forEach((t,i)=>{const b=el('button','',t);b.type='button';if(fonts)b.style.fontFamily=fonts[i];b.onclick=()=>{set(i);place();after()};box.appendChild(b)});
+  segs.push(place);return place;
+}
+
+/* ---------- shared ---------- */
+const PAL=[['#ecebe6','#111111'],['#111111','#ecebe6'],['#d6d5cf','#111111'],['#3b3b3b','#f1f1ee']];
+const tint=b=>{let h=7;for(const c of b.title)h=(h*31+c.charCodeAt(0))>>>0;return PAL[h%PAL.length]};
+const initial=b=>(b.title.match(/[A-Za-zА-Яа-яЁё0-9]/)||['·'])[0].toUpperCase();
+const pct=b=>Math.round((posOf(b).p||0)*100);
+function cover(b,cls){ /* the file's own cover, or one set from the title */
+  const c=el('span','cv'+(cls?' '+cls:''));
+  if(b.cover){const im=el('img');im.src=b.cover;im.alt='';c.appendChild(im)}
+  else{const [bg,ink]=tint(b);c.style.background=bg;c.style.color=ink;c.append(el('b','',b.title),el('i','',b.author||b.fmt))}
+  const p=el('u');p.style.setProperty('--p',posOf(b).p||0);c.appendChild(p);return c;
+}
+const state=b=>{const n=pct(b);return n>=100?'дочитано':n>0?n+'% · осталось '+mins(b.words*(1-posOf(b).p)/WPM):mins(b.words/WPM)};
+const verb=b=>{const n=pct(b);return n>=100?'Перечитать':n>0?'Продолжить':'Читать'};
+const excerpt=(b,max)=>{let t='';for(const [k,x] of b.blocks){if(k==='h'||k==='s')continue;t+=(t?' ':'')+x.replace(/\n/g,' ');if(t.length>=max)break}return t.length>max?t.slice(0,max).replace(/\s+\S*$/,'')+'…':t};
+const chapterAt=(b,i)=>{for(let k=Math.min(i,b.blocks.length-1);k>=0;k--)if(b.blocks[k][0]==='h')return b.blocks[k][1];return ''};
+const sorted=()=>{const at=b=>ls.get('open-'+b.id,0)||b.date;return [...books].sort((a,b)=>at(b)-at(a))};
+let notes=ls.get('notes',[]);
+const keep=()=>ls.set('notes',notes);
+const flat=s=>s.replace(/\s+/g,' ').trim();
+const quote=n=>'«'+n.text+'»\n— '+[n.author,n.title].filter(Boolean).join(', ');
+/* ribbons: the card nearest the middle is full size, the others step back a little */
+function tune(car){
+  const mid=car.getBoundingClientRect().left+car.clientWidth/2;
+  for(const c of car.children){const r=c.getBoundingClientRect(),d=Math.min(1,Math.abs(r.left+r.width/2-mid)/r.width);const side=r.left+r.width/2<mid?1:-1;
+    c.style.transform='perspective(900px) rotateY('+(side*d*20)+'deg) scale('+(1-d*.1)+')';c.style.opacity=1-d*.5}
+}
+function ribbon(cards){
+  const car=el('div','car');cards.forEach(c=>car.appendChild(c));
+  if(!still){let raf=0;car.addEventListener('scroll',()=>{if(!raf)raf=requestAnimationFrame(()=>{raf=0;tune(car)})},{passive:true});requestAnimationFrame(()=>tune(car))}
+  return car;
+}
+const bookCard=b=>{const c=el('button','cc');c.append(cover(b),el('b','',b.title),el('i','',[b.author,state(b)].filter(Boolean).join(' · ')));c.onclick=()=>openPage(b);return c};
+
+let toastT=0;
+function toast(msg){const t=$('toast');t.lastChild.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),1500)}
+/* a control changes what it says: the old content shrinks and blurs out, the new one comes in */
+function morph(elm,set){
+  if(still||!elm.animate){set();return}
+  elm.animate([{opacity:1,transform:'none',filter:'blur(0)'},{opacity:0,transform:'scale(.6)',filter:'blur(4px)'}],{duration:110,easing:'ease-in'}).onfinish=()=>{
+    set();elm.animate([{opacity:0,transform:'scale(.6)',filter:'blur(4px)'},{opacity:1,transform:'none',filter:'blur(0)'}],{duration:200,easing:'cubic-bezier(.22,1,.36,1)'})};
+}
+/* ---------- hidden under a code: a book or a note shows no name and no text until the code is entered ---------- */
+const LOCK='<svg viewBox="0 0 18 18"><rect x="4" y="8" width="10" height="7" rx="2"/><path d="M6.5 8V6a2.5 2.5 0 015 0v2"/></svg>';
+let lockHash=ls.get('lock',null),unlocked=false,askThen=null,askSet=false;
+const hsh=s=>{let h=5381;for(const c of s)h=((h*33)^c.charCodeAt(0))>>>0;return h.toString(36)};
+const isHidB=b=>!!b&&!!b.locked,isHidN=n=>!!n.locked||isHidB(books.find(b=>b.id===n.book));
+/* "not in the view you are in": the main lists leave hidden things out, the hidden place shows only them */
+const hiddenB=b=>isHidB(b)!==unlocked,hidN=n=>isHidN(n)!==unlocked;
+function hidRow(box,any,label){
+  if(unlocked||!any)return;
+  const r=el('button','hidrow');r.innerHTML=LOCK;r.append(el('span','',label));r.insertAdjacentHTML('beforeend','<svg viewBox="0 0 12 12"><path d="M4.5 2.5L8 6l-3.5 3.5"/></svg>');
+  r.onclick=()=>ask(()=>{});box.appendChild(r);
+}
+const saveBook=b=>b.sample?ls.set('s-lock',!!b.locked):idb('readwrite',s=>s.put(b));
+/* the bottom bar turns into a code field and back */
+function ask(then,set){
+  if(!set&&unlocked)return then();
+  askThen=then;askSet=!!set;const c=$('code');c.value='';c.placeholder=set?'Придумайте код':'Код';$('codego').textContent=set?'Задать':'Открыть';
+  const fg=$('codeforgot');fg.hidden=!!set;fg.textContent='Забыл код';fg.classList.remove('ask');
+  app.classList.add('asking');$('codebar').classList.add('on');c.focus();
+}
+function askClose(){app.classList.remove('asking');$('codebar').classList.remove('on','bad');$('code').blur();askThen=null}
+$('codebar').onsubmit=e=>{
+  e.preventDefault();const v=$('code').value.trim(),bar=$('codebar');if(!v)return;
+  if(askSet){lockHash=hsh(v);ls.set('lock',lockHash)}
+  else if(hsh(v)!==lockHash){bar.classList.remove('bad');bar.offsetWidth;bar.classList.add('bad');$('code').value='';return}
+  if(!askSet)unlocked=true;const t=askThen;askClose();render();if(t)t();
+};
+$('codex').onclick=askClose;
+/* a forgotten code is reset in two taps: everything hidden returns to the lists and a new code can be set */
+$('codeforgot').onclick=()=>{
+  const fg=$('codeforgot');if(!fg.classList.contains('ask')){fg.classList.add('ask');fg.textContent='Сбросить и показать всё';return}
+  lockHash=null;ls.del('lock');books.forEach(b=>{if(b.locked){b.locked=false;saveBook(b)}});notes.forEach(n=>{delete n.locked});keep();
+  unlocked=false;askClose();render();toast('Код сброшен');
+};
+$('relock').onclick=()=>{unlocked=false;editing=null;closePage();render()};
+/* ---------- tabs ---------- */
+let tab='home';
+function go(t){
+  tab=t;for(const k of ['home','notes'])$('v-'+k).hidden=k!==t;
+  $('scroll').scrollTop=0;placeTabs();render();
+}
+const placeTabs=seg('ltabs',['Книги','Заметки'],()=>tab==='home'?0:1,i=>{tab=i?'notes':'home'},()=>go(tab));
+[...$('ltabs').querySelectorAll('button')].forEach((b,i)=>b.insertAdjacentHTML('afterbegin',i?'<svg viewBox="0 0 24 24" stroke-width="1.5"><path d="M9.25 9.05c1.78.65 3.72.65 5.5 0"/><path d="M16.82 2H7.18C5.05 2 3.32 3.74 3.32 5.86v14.09c0 1.8 1.29 2.56 2.87 1.69l4.88-2.71c.52-.29 1.36-.29 1.87 0l4.88 2.71c1.58.88 2.87.12 2.87-1.69V5.86C20.68 3.74 18.95 2 16.82 2z"/></svg>':'<svg viewBox="0 0 24 24" stroke-width="1.5"><path d="M22 16.74V4.67c0-1.2-.98-2.09-2.17-1.99h-.06c-2.1.18-5.29 1.25-7.07 2.37l-.17.11c-.29.18-.77.18-1.06 0l-.25-.15C9.44 3.9 6.26 2.84 4.16 2.67 2.97 2.57 2 3.47 2 4.66v12.08c0 .96.78 1.86 1.74 1.98l.29.04c2.17.29 5.52 1.39 7.44 2.44l.04.02c.27.15.7.15.96 0 1.92-1.06 5.28-2.17 7.46-2.46l.33-.04c.96-.12 1.74-1.02 1.74-1.98z"/><path d="M12 5.49v15M7.75 8.49H5.5M8.5 11.49h-3"/></svg>'));
+function render(){
+  if(tab==='home')renderHome();else renderNotes();
+  $('relock').hidden=!unlocked;
+  if(pageBook){if(books.includes(pageBook))renderPage(pageBook);else closePage()}
+}
+
+/* ---------- home: one list; typing in the field turns the same list into search results ---------- */
+let qT=0;
+$('q').oninput=()=>{qOpen=null;clearTimeout(qT);qT=setTimeout(renderHome,140)};
+$('qx').onclick=e=>{e.preventDefault();$('q').value='';renderHome();$('q').focus()};
+function bookRow(b,box,first){
+  const r=el('div','brow'),o=el('button','eopen'),et=el('div','et'),g=el('button','get'+(first?' pri':'')),n=pct(b),c=cover(b,'th');
+  r.dataset.id=b.id;o.setAttribute('aria-label','О книге: '+b.title);o.onclick=()=>openPage(b,r);
+  if(!b.cover)c.appendChild(el('em','',initial(b)));
+  et.append(el('b','',b.title),el('i','',[b.author,n>=100?'дочитано':n>0?'осталось '+mins(b.words*(1-posOf(b).p)/WPM):mins(b.words/WPM)].filter(Boolean).join(' · ')));
+  if(n>=100)g.innerHTML=IC.ok;else g.textContent=n>0?n+'%':'Читать';
+  g.setAttribute('aria-label','Читать: '+b.title);g.onclick=()=>openBook(b);
+  if(hiddenB(b)){r.classList.add('lk');et.textContent='';et.append(el('b','','Скрытая книга'),el('i','','Под кодом'));o.setAttribute('aria-label','Скрытая книга');o.onclick=()=>ask(()=>openPage(b));g.innerHTML=LOCK;g.className='get';g.setAttribute('aria-label','Открыть по коду');g.onclick=()=>ask(()=>openBook(b))}
+  r.append(o,c,et,g);box.appendChild(r);
+}
+function hitRow(b,i,text,q,sub,box){
+  const low=text.toLowerCase(),a=low.indexOf(q),from=Math.max(0,a-36),r=el('div','brow'),o=el('button','eopen'),et=el('div','et'),t=el('b','wrap');
+  o.onclick=()=>openBook(b,{i,f:0});
+  t.append((from?'…':'')+text.slice(from,a),el('mark','',text.slice(a,a+q.length)),text.slice(a+q.length,a+q.length+70)+(text.length>a+q.length+70?'…':''));
+  et.append(t,el('i','',sub));r.append(o,et);box.appendChild(r);
+}
+function renderHome(){
+  document.querySelector('#v-home .lt').textContent=unlocked?'Скрытые':'Книги';
+  const qv=$('q').value.trim();$('qx').hidden=!qv;if(!qv)qOpen=null;
+  renderHomeCore();if(!qv){dupRow($('hlist'));hidRow($('hlist'),books.some(isHidB),'Скрытые')}
+}
+function renderHomeCore(){
+  const box=$('hlist'),q=$('q').value.trim().toLowerCase(),bs=sorted().filter(b=>!hiddenB(b));box.textContent='';
+  if(!bs.length&&(unlocked||books.some(isHidB))){if(unlocked)box.appendChild(el('p','hint','Скрытых книг нет'));return}
+  if(!bs.length){box.appendChild(el('p','hint','Здесь будут ваши книги. Нажмите плюс и выберите файл: FB2, EPUB, PDF, DOCX или TXT.'));return}
+  box.classList.toggle('q',!!q);
+  if(!q){bs.forEach((b,k)=>bookRow(b,box,k===0));return}
+  /* results come in three labelled parts: books by name, your notes, places in the text gathered by book */
+  const head=(t,c)=>box.appendChild(el('p','ghead',t+' · '+c));
+  const bk=bs.filter(b=>(b.title+' '+b.author).toLowerCase().includes(q));
+  const nt=[];notes.forEach(x=>{const b=bs.find(v=>v.id===x.book);if(!b||hidN(x))return;const f=[x.thought,x.edit,x.text].find(v=>v&&v.toLowerCase().includes(q));if(f)nt.push([x,b,flat(f)])});
+  const tx=[];let total=0;
+  for(const b of bs){const low=lowOf(b),hs=[];for(let i=0;i<low.length;i++)if(low[i].includes(q))hs.push(i);if(hs.length){tx.push([b,hs]);total+=hs.length}}
+  if(!bk.length&&!nt.length&&!tx.length){box.appendChild(el('p','hint','По запросу «'+$('q').value.trim()+'» ничего нет'));return}
+  if(bk.length){head('Книги',bk.length);bk.forEach(b=>bookRow(b,box))}
+  if(nt.length){head('Заметки',nt.length);nt.forEach(([x,b,t])=>hitRow(b,x.i,t,q,b.title,box))}
+  if(tx.length){
+    head('В тексте',total);
+    tx.forEach(([b,hs])=>{
+      const open=qOpen===b.id||tx.length===1,show=hs.slice(0,open?40:2);
+      if(tx.length>1)box.appendChild(el('p','gsub',b.title+' · '+hs.length));
+      show.forEach(i=>hitRow(b,i,b.blocks[i][1].replace(/\n/g,' '),q,[chapterAt(b,i),Math.round(i/b.blocks.length*100)+'%'].filter(Boolean).join(' · '),box));
+      if(hs.length>show.length){const m=el('button','more',open?'Показаны первые 40':'Ещё '+(hs.length-show.length));if(!open)m.onclick=()=>{qOpen=b.id;renderHome()};else m.disabled=true;box.appendChild(m)}
+    });
+  }
+}
+/* lower-cased text of a book is prepared once, so typing stays quick */
+const lowCache=new WeakMap();let qOpen=null;
+function lowOf(b){let l=lowCache.get(b);if(!l){l=b.blocks.map(x=>x[1].toLowerCase());lowCache.set(b,l)}return l}
+/* the same file added more than once */
+function copies(){const m=new Map();books.forEach(b=>{if(b.sample)return;const k=b.title+'|'+b.words;m.set(k,(m.get(k)||[]).concat(b))});return [...m.values()].filter(g=>g.length>1)}
+function dupRow(box){
+  const gs=copies(),n=gs.reduce((a,g)=>a+g.length-1,0);if(!n||unlocked)return;
+  const r=el('button','hidrow');r.innerHTML=IC.copy;const sp=el('span','','Убрать копии · '+n);r.appendChild(sp);let tm=0;
+  r.onclick=()=>{
+    if(!r.classList.contains('ask')){r.classList.add('ask');sp.textContent='Убрать '+n+' · нажмите ещё раз';tm=setTimeout(()=>{r.classList.remove('ask');sp.textContent='Убрать копии · '+n},3000);return}
+    clearTimeout(tm); /* the copy you have read furthest stays; notes move to it */
+    gs.forEach(g=>{g.sort((a,b)=>(posOf(b).p||0)-(posOf(a).p||0)||(b.cover?1:0)-(a.cover?1:0));const keepB=g[0];
+      g.slice(1).forEach(d=>{notes.forEach(x=>{if(x.book===d.id)x.book=keepB.id});books=books.filter(v=>v!==d);ls.del('pos-'+d.id);ls.del('open-'+d.id);idb('readwrite',st=>st.delete(d.id))})});
+    keep();render();toast('Копии убраны');
+  };
+  box.appendChild(r);
+}
+
+/* ---------- notes: the quote, what you changed in it, and your own thought ---------- */
+/* word-level difference between the book's text and your version: only what you added is marked */
+function diff(a,b){
+  const A=a.split(/(\s+)/),B=b.split(/(\s+)/),n=A.length,m=B.length;
+  if(n*m>160000){let p=0;while(p<n&&p<m&&A[p]===B[p])p++;let q=0;while(q<n-p&&q<m-p&&A[n-1-q]===B[m-1-q])q++;
+    return [[0,B.slice(0,p).join('')],[1,B.slice(p,m-q).join('')],[0,B.slice(m-q).join('')]].filter(x=>x[1])}
+  const L=Array.from({length:n+1},()=>new Uint16Array(m+1));
+  for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)L[i][j]=A[i]===B[j]?L[i+1][j+1]+1:Math.max(L[i+1][j],L[i][j+1]);
+  const out=[];let i=0,j=0;const push=(t,w)=>{const l=out[out.length-1];if(l&&l[0]===t)l[1]+=w;else out.push([t,w])};
+  while(j<m){if(i<n&&A[i]===B[j]){push(0,B[j]);i++;j++}else if(i<n&&L[i+1][j]>=L[i][j+1])i++;else{push(/\S/.test(B[j])?1:0,B[j]);j++}}
+  return out;
+}
+const copyOf=n=>quote(n)+(n.thought?'\n\n'+n.thought:'');
+let editing=null,nf={q:'',chip:'all'},nqT=0;
+$('nq').oninput=e=>{nf.q=e.target.value;clearTimeout(nqT);nqT=setTimeout(renderNotes,140)};
+function grow(t){t.style.height='0';t.style.height=t.scrollHeight+'px'}
+function renderNotes(){
+  document.querySelector('#v-notes .lt').textContent=unlocked?'Скрытые':'Заметки';
+  renderNotesCore();if(!nf.q.trim())hidRow($('notes'),notes.some(isHidN),'Скрытые заметки');
+}
+function renderNotesCore(){
+  const vis=notes.filter(n=>!hidN(n));
+  const box=$('notes'),chips=$('nchips');box.textContent='';chips.textContent='';
+  $('nsearch').hidden=chips.hidden=!vis.length;
+  if(!vis.length&&(unlocked||notes.some(isHidN))){if(unlocked)box.appendChild(el('p','hint','Скрытых заметок нет'));return}
+  if(!vis.length){box.appendChild(el('p','hint','Здесь появятся места из книг. В книге коснитесь абзаца, нажмите «Сохранить» и при желании допишите мысль.'));return}
+  /* filters: everything, notes with a thought, your own groups, then each book */
+  const groups=[...new Set(vis.map(n=>n.group).filter(Boolean))].sort(),ids=[...new Set(vis.map(n=>n.book))];
+  const bname=id=>(vis.find(n=>n.book===id)||{}).title||'Книга';
+  const opts=[['all','Все',()=>true],['th','С мыслями',n=>!!n.thought],...groups.map(g=>['g:'+g,g,n=>n.group===g]),...ids.map(id=>['b:'+id,bname(id),n=>n.book===id])];
+  if(!opts.some(o=>o[0]===nf.chip))nf.chip='all';
+  opts.forEach(([k,name,f])=>{const c=vis.filter(f).length;if(k==='th'&&!c)return;const b=el('button','chipb',name);b.appendChild(el('i','',String(c)));b.setAttribute('aria-pressed',String(nf.chip===k));b.onclick=()=>{nf.chip=k;editing=null;renderNotes()};chips.appendChild(b)});
+  $('groups').textContent='';groups.forEach(g=>{const o=el('option');o.value=g;$('groups').appendChild(o)});
+  const q=nf.q.trim().toLowerCase(),f=opts.find(o=>o[0]===nf.chip)[2];
+  const found=vis.filter(f).filter(n=>!q||[n.text,n.edit,n.thought,n.title,n.chapter,n.group].some(x=>x&&x.toLowerCase().includes(q)));
+  if(!found.length){box.appendChild(el('p','hint','Ничего не нашлось'));return}
+  /* inside a filter the notes are gathered by book, in the order they stand in it */
+  const list=[];[...new Set(found.map(n=>n.book))].forEach(id=>{const part=found.filter(n=>n.book===id).sort((a,b)=>a.i-b.i);
+    if(!nf.chip.startsWith('b:'))list.push({head:bname(id)+' · '+part.length});list.push(...part)});
+  list.forEach((n,k)=>{
+    if(n.head){box.appendChild(el('p','ghead',n.head));return}
+    if(hidN(n)){const c=el('button','note lockn');c.innerHTML=LOCK;c.appendChild(el('span','','Скрытая заметка'));c.onclick=()=>ask(()=>{});box.appendChild(c);return}
+    const c=el('div','note'),bk=books.find(b=>b.id===n.book);c.style.animationDelay=Math.min(k,6)*40+'ms';
+    if(editing===n.id){ /* the card itself turns into the editor */
+      const q=el('textarea','nq'),t=el('textarea','nt'),foot=el('div','nfoot'),back=el('button','nsrc','Вернуть как в книге'),done=el('button','get pri','Готово');
+      q.value=n.edit||n.text;q.setAttribute('aria-label','Текст заметки');t.value=n.thought||'';t.placeholder='Ваша мысль';t.setAttribute('aria-label','Ваша мысль');
+      const gi=el('input','ng');gi.value=n.group||'';gi.placeholder='Группа';gi.setAttribute('list','groups');gi.setAttribute('aria-label','Группа');gi.autocomplete='off';
+      [q,t].forEach(x=>{x.rows=1;x.oninput=()=>{grow(x);back.style.visibility=q.value.trim()===n.text?'hidden':''}});
+      back.style.visibility=q.value.trim()===n.text?'hidden':'';back.onclick=()=>{q.value=n.text;grow(q);back.style.visibility='hidden'};
+      done.onclick=()=>{const v=q.value.trim();if(v&&v!==n.text)n.edit=v;else delete n.edit;const th=t.value.trim();if(th)n.thought=th;else delete n.thought;const gv=gi.value.trim();if(gv)n.group=gv;else delete n.group;keep();editing=null;renderNotes()};
+      const lkb=el('button','ni',n.locked?'Вернуть':'Скрыть'),flip=()=>{n.locked=!n.locked;keep();editing=null;renderNotes();toast(n.locked?'Перенесена в скрытые':'Возвращена в заметки')};
+      lkb.onclick=()=>lockHash?flip():ask(flip,true);
+      foot.append(back,lkb,done);c.append(q,t,gi,foot);box.appendChild(c);requestAnimationFrame(()=>{grow(q);grow(t)});return;
+    }
+    const p=el('p','nq'),open=()=>{editing=n.id;renderNotes();const t=box.querySelector('.nt');if(t)t.focus()};
+    if(n.edit)diff(n.text,n.edit).forEach(([mine,w])=>p.append(mine?el('ins','',w):w));else p.textContent=n.text;
+    p.onclick=open;c.appendChild(p);
+    const th=el('button',n.thought?'nthought':'nadd',n.thought||'Добавить мысль');th.onclick=open;c.appendChild(th);
+    /* one quiet line under the note: where it is from (tap to go there), copy, remove */
+    const foot=el('div','nfoot'),src=el('button','nsrc'),cp=el('button','ni'),rm=el('button','ni');
+    src.appendChild(el('span','',n.chapter||n.title));
+    if(bk){src.insertAdjacentHTML('beforeend','<svg viewBox="0 0 12 12"><path d="M4.5 2.5L8 6l-3.5 3.5"/></svg>');src.setAttribute('aria-label','Открыть в книге');src.onclick=()=>openBook(bk,{i:n.i,f:0})}else src.disabled=true;
+    cp.innerHTML=IC.copy;cp.setAttribute('aria-label','Скопировать');
+    cp.onclick=()=>copyText(copyOf(n),()=>{toast('Скопировано');morph(cp.firstChild,()=>{cp.innerHTML=IC.ok});setTimeout(()=>morph(cp.firstChild,()=>{cp.innerHTML=IC.copy}),1400)});
+    rm.innerHTML=IC.x;rm.setAttribute('aria-label','Убрать заметку');let tm=0; /* two taps: the cross turns into a word for three seconds */
+    rm.onclick=()=>{
+      if(!rm.classList.contains('ask')){rm.classList.add('ask');rm.textContent='Убрать';tm=setTimeout(()=>{rm.classList.remove('ask');rm.innerHTML=IC.x},3000);return}
+      clearTimeout(tm);notes=notes.filter(v=>v!==n);keep();c.style.transition='opacity .2s,transform .25s var(--ease)';c.style.opacity='0';c.style.transform='scale(.96)';setTimeout(renderNotes,still?0:220)};
+    if(n.group)foot.appendChild(el('span','ntag',n.group));foot.append(src,cp,rm);c.appendChild(foot);box.appendChild(c);
+  });
+}
+
+/* ---------- book page ---------- */
+const bpage=$('bpage');let pageBook=null,allCh=false;
+const FULL='inset(0px 0px 0px 0px round 28px 28px 0px 0px)',DOWN='inset(100% 0px 0px 0px round 28px 28px 0px 0px)';
+function rowInset(id,scaled){
+  const r=$('hlist').querySelector('[data-id="'+id+'"]');if(!r||tab!=='home')return DOWN;
+  const q=r.getBoundingClientRect(),v=bpage.getBoundingClientRect();let l=q.left,t=q.top,ri=q.right,bo=q.bottom;
+  if(scaled){const c=$('scroll').getBoundingClientRect(),cx=c.left+c.width/2,k=.94;l=(l-cx)/k+cx;ri=(ri-cx)/k+cx;t=(t-c.top)/k+c.top;bo=(bo-c.top)/k+c.top} /* the list behind is stepped back; undo that to find the row */
+  if(bo<v.top+20||t>v.bottom-20)return DOWN;
+  const p=n=>Math.max(0,Math.round(n))+'px';return 'inset('+p(t-v.top)+' '+p(v.right-ri)+' '+p(v.bottom-bo)+' '+p(l-v.left)+' round 12px)';
+}
+function openPage(b){
+  pageBook=b;allCh=false;renderPage(b);$('bbody').scrollTop=0;
+  bpage.style.transition='none';bpage.style.clipPath=rowInset(b.id);bpage.offsetWidth;bpage.style.transition='';
+  bpage.classList.add('on');bpage.setAttribute('aria-hidden','false');app.classList.add('deep');bpage.style.clipPath=FULL;
+}
+function closePage(){if(!pageBook)return;bpage.style.clipPath=rowInset(pageBook.id,true);app.classList.remove('deep');pageBook=null;bpage.classList.remove('on');bpage.setAttribute('aria-hidden','true')}
+$('bclose').onclick=closePage;
+$('bgrab').onkeydown=e=>{if(e.key==='Enter'||e.key===' ')closePage()};
+$('scroll').addEventListener('click',e=>{if(pageBook){e.stopPropagation();closePage()}},true); /* the strip of the list above the sheet closes it */
+/* the sheet follows the finger down by its handle and closes on a pull or a flick */
+{let g=null;const h=$('bgrab');
+  h.addEventListener('pointerdown',e=>{g={y:e.clientY,ly:e.clientY,lt:e.timeStamp,v:0,id:e.pointerId};try{h.setPointerCapture(e.pointerId)}catch(_){}bpage.style.transition='none'});
+  h.addEventListener('pointermove',e=>{if(!g||e.pointerId!==g.id)return;const dy=e.clientY-g.y,dt=Math.max(1,e.timeStamp-g.lt);g.v=.7*(e.clientY-g.ly)/dt+.3*g.v;g.ly=e.clientY;g.lt=e.timeStamp;bpage.style.transform='translateY('+(dy>0?dy:dy*.15)+'px)'});
+  const end=e=>{if(!g||e.pointerId!==g.id)return;const q=g;g=null;const dy=e.clientY-q.y;if(e.timeStamp-q.lt>80)q.v=0;bpage.style.transition='';bpage.style.transform='';
+    if(e.type==='pointerup'&&Math.abs(dy)<6)return closePage(); /* a tap on the handle closes too */
+    if(e.type==='pointerup'&&dy+q.v*200>120){bpage.style.clipPath=DOWN;app.classList.remove('deep');pageBook=null;bpage.classList.remove('on');bpage.setAttribute('aria-hidden','true')}};
+  h.addEventListener('pointerup',end);h.addEventListener('pointercancel',end)}
+function renderPage(b){
+  const v=$('bbody'),at=posOf(b),read=el('button','pillb',verb(b)),row=el('div','rowb');v.textContent='';
+  read.onclick=()=>openBook(b);row.appendChild(read);
+  v.append(cover(b,'bp-cv'),el('h2','bp-t',b.title));if(b.author)v.appendChild(el('p','bp-a',b.author));
+  const lk=el('button','quiet',b.locked?'Вернуть из скрытых':'Скрыть'),flip=()=>{b.locked=!b.locked;saveBook(b);closePage();render();toast(b.locked?'Перенесена в скрытые':'Возвращена в книги')};
+  lk.onclick=()=>lockHash?flip():ask(flip,true);
+  v.append(el('p','bp-m',[b.fmt,state(b)].join(' · ')),row);
+  const ex=excerpt(b,420);if(ex)v.append(el('h3','sec','Начало'),el('p','bp-x',ex));
+  const heads=[];b.blocks.forEach((x,i)=>{if(x[0]==='h')heads.push([i,x[1]])});
+  if(heads.length){
+    let now=-1;heads.forEach((h,k)=>{if(h[0]<=at.i)now=k});
+    v.appendChild(el('h3','sec','Главы'));
+    (allCh?heads:heads.slice(0,8)).forEach((h,k)=>{const r=el('button','chr'+(k===now&&pct(b)>0?' now':''));r.append(el('span','',String(k+1).padStart(2,'0')),el('b','',h[1]));r.onclick=()=>openBook(b,{i:h[0],f:0});v.appendChild(r)});
+    if(!allCh&&heads.length>8){const m=el('button','pillb sub','Все главы · '+heads.length),w=el('div','rowb');m.onclick=()=>{allCh=true;renderPage(b)};w.appendChild(m);v.appendChild(w)}
+  }
+  const mine=notes.filter(n=>n.book===b.id).sort((x,y)=>x.i-y.i);
+  if(mine.length)v.append(el('h3','sec','Заметки'),ribbon(mine.map(n=>{const c=el('button','cc q');c.append(el('p','',n.text),el('i','',n.chapter||b.title));c.onclick=()=>openBook(b,{i:n.i,f:0});return c})));
+  const f=el('dl','facts'),fact=(k,x)=>f.append(el('dt','',k),el('dd','',x));
+  fact('Формат',b.fmt);fact('Объём',b.words.toLocaleString('ru')+' слов');fact('Время чтения',mins(b.words/WPM));if(heads.length)fact('Глав',String(heads.length));if(b.date)fact('Добавлена',new Date(b.date).toLocaleDateString('ru',{day:'numeric',month:'long'}));
+  v.append(el('h3','sec','Сведения'),f);
+  const rm=el('button','hold');let tm=0;rm.append(el('i'),el('span','h1','Убрать книгу'),el('span','h2','Удерживайте, чтобы убрать'));let t0=0,tip=0;
+  const stop=()=>{clearTimeout(tm);if(!rm.classList.contains('go'))return;rm.classList.remove('go');if(Date.now()-t0<350){rm.classList.add('tip');clearTimeout(tip);tip=setTimeout(()=>rm.classList.remove('tip'),1800)}};
+  rm.onpointerdown=()=>{t0=Date.now();clearTimeout(tip);rm.classList.remove('tip');rm.classList.add('go');tm=setTimeout(()=>{
+    books=books.filter(x=>x!==b);ls.del('pos-'+b.id);ls.del('open-'+b.id);if(b.sample)ls.set('no-sample',1);else idb('readwrite',s=>s.delete(b.id));
+    pageBook=null;bpage.style.clipPath=DOWN;bpage.classList.remove('on');app.classList.remove('deep');render()},still?400:1100)};
+  rm.onpointerup=rm.onpointerleave=rm.onpointercancel=stop;rm.oncontextmenu=e=>e.preventDefault();
+  v.append(lk,rm);
+}
+
+/* ---------- reader ---------- */
+const FONTS=[['Inter',"Inter,-apple-system,'Segoe UI',Roboto,sans-serif"],['Plex',"'IBM Plex Sans','Segoe UI',Roboto,sans-serif"],['Literata',"Literata,'Iowan Old Style',Georgia,serif"],['Source',"'Source Serif 4',Georgia,serif"]];
+const WEIGHTS=[[400,'Обычная'],[500,'Плотнее']];
+const THEMES=[['dark','Тёмный'],['light','Светлый'],['paper','Бумага']];
+const ui=Object.assign({fs:19,font:0,fw:400,theme:'dark',focus:true},ls.get('reader-ui-2',{}));
+if(!THEMES.some(t=>t[0]===ui.theme))ui.theme='dark';
+function applyUi(){
+  const at=cur?where():null,r=document.documentElement;
+  if(ui.theme==='dark')delete r.dataset.read;else r.dataset.read=ui.theme;
+  r.style.setProperty('--fs',ui.fs+'px');r.style.setProperty('--read',FONTS[ui.font][1]);r.style.setProperty('--fw',ui.fw);
+  reader.classList.toggle('plain',!ui.focus);$('fval').textContent=ui.fs;$('fsize').value=ui.fs;$('fsize').style.setProperty('--v',(ui.fs-15)/13);ls.set('reader-ui-2',ui);
+  if(at){goTo(at);tick()}
+}
+seg('fonts',FONTS.map(f=>f[0]),()=>ui.font,i=>ui.font=i,applyUi,FONTS.map(f=>f[1]));
+seg('weights',WEIGHTS.map(w=>w[1]),()=>WEIGHTS.findIndex(w=>w[0]===ui.fw),i=>ui.fw=WEIGHTS[i][0],applyUi);
+seg('themes',THEMES.map(t=>t[1]),()=>THEMES.findIndex(t=>t[0]===ui.theme),i=>ui.theme=THEMES[i][0],applyUi);
+seg('focus',['Вкл','Выкл'],()=>ui.focus?0:1,i=>ui.focus=i===0,applyUi);
+$('fsize').oninput=e=>{ui.fs=+e.target.value;applyUi()};
+
+let heads=[],first=0; /* first = index of the first real block among the article's children */
+const blockEl=i=>text.children[first+i];
+const padTop=()=>parseFloat(getComputedStyle(rscroll).paddingTop)||0;
+function where(){ /* which block sits at the reading line, and how far into it */
+  const kids=text.children,y=rscroll.scrollTop+padTop();let lo=first,hi=kids.length-1;
+  while(lo<hi){const m=(lo+hi+1)>>1;if(kids[m].offsetTop<=y)lo=m;else hi=m-1}
+  const k=kids[lo];if(!k)return {i:0,f:0};
+  return {i:lo-first,f:Math.max(0,Math.min(1,(y-k.offsetTop)/Math.max(1,k.offsetHeight)))};
+}
+function goTo(at){const k=blockEl(at.i);if(k)rscroll.scrollTop=k.offsetTop-padTop()+at.f*k.offsetHeight}
+function progress(){const max=rscroll.scrollHeight-rscroll.clientHeight;return max>0?Math.max(0,Math.min(1,rscroll.scrollTop/max)):1}
+let raf=0,saveT=0,lastY=0;
+function tick(){
+  raf=0;if(!cur)return;
+  const p=progress();
+  $('rchip').innerHTML=p>=.995?okSvg:ringSvg(p);$('rchip').append(Math.round(p*100)+'%');$('tleft').textContent=p>=.995?'Дочитано':'Осталось '+mins(cur.words*(1-p)/WPM);
+  const y=rscroll.scrollTop+padTop()+8;let h=null;for(const x of heads){if(x.el.offsetTop<=y)h=x;else break}
+  $('rname').textContent=h?h.s:cur.title;ruler.style.setProperty('--p',p);
+  heads.forEach(x=>x.btn&&x.btn.classList.toggle('now',x===h));
+}
+function savePos(){if(cur)ls.set('pos-'+cur.id,Object.assign(where(),{p:progress()}))}
+
+/* the ruler scrubs the book */
+const ruler=$('ruler');
+function ticks(){
+  ruler.querySelectorAll('u').forEach(u=>u.remove());const max=Math.max(1,rscroll.scrollHeight-rscroll.clientHeight);
+  heads.forEach(h=>{const u=el('u');u.style.left=Math.min(100,(h.el.offsetTop-padTop())/max*100)+'%';ruler.appendChild(u)});
+}
+{let on=false;const move=e=>{const r=ruler.getBoundingClientRect(),p=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));rscroll.scrollTop=p*(rscroll.scrollHeight-rscroll.clientHeight);tick()};
+  ruler.addEventListener('pointerdown',e=>{on=true;try{ruler.setPointerCapture(e.pointerId)}catch(_){}move(e)});
+  ruler.addEventListener('pointermove',e=>{if(on)move(e)});
+  const end=()=>{on=false};ruler.addEventListener('pointerup',end);ruler.addEventListener('pointercancel',end)}
+/* sheets above the bottom row */
+const sheetOn=()=>reader.classList.contains('s-set')||reader.classList.contains('s-toc');
+function sheet(w){
+  reader.classList.remove('s-set','s-toc');if(!w)return;
+  reader.classList.add('s-'+w);segs.forEach(f=>f());
+  if(w==='toc'){ticks();const n=$('toc').querySelector('.now');if(n)n.parentNode.scrollTop=n.offsetTop-n.parentNode.clientHeight/2}
+}
+$('aa').onclick=()=>sheet(reader.classList.contains('s-set')?null:'set');
+$('info').onclick=()=>sheet(reader.classList.contains('s-toc')?null:'toc');
+
+/* kept passages are tinted in the text */
+function markBlock(i){
+  const e=blockEl(i),s=cur.blocks[i][1],f=s.replace(/\n/g,' ');if(!e)return;
+  const cuts=[];for(const n of notes){if(n.book!==cur.id||n.i!==i)continue;const a=f.indexOf(n.text.replace(/\n/g,' '));if(a>=0)cuts.push([a,a+n.text.length])}
+  e.textContent='';if(!cuts.length){e.textContent=s;return}
+  cuts.sort((a,b)=>a[0]-b[0]);let at=0;
+  for(const [a,b] of cuts){if(a<at)continue;if(a>at)e.append(s.slice(at,a));e.appendChild(el('mark','',s.slice(a,b)));at=b}
+  if(at<s.length)e.append(s.slice(at));
+}
+const chapterOf=i=>{for(let k=i;k>=0;k--)if(cur.blocks[k][0]==='h')return cur.blocks[k][1];return ''};
+/* a pick is a tapped block or words selected by hand; the bottom row then offers to copy or keep it */
+let picked=null,holdSel=0;
+const same=p=>n=>n.book===cur.id&&n.i===p.i&&flat(n.text)===flat(p.text);
+const pop=$('pop');
+function unpick(){if(picked&&picked.box)picked.box.classList.remove('pick','keep');picked=null;reader.classList.remove('pick');pop.classList.remove('on','think')}
+function drop(){try{getSelection().removeAllRanges()}catch(e){}unpick()}
+/* the menu sits right under the passage, or above it when there is no room */
+function place(){
+  if(!picked)return;const r=picked.box.getBoundingClientRect(),v=reader.getBoundingClientRect(),h=pop.offsetHeight,w=pop.offsetWidth;
+  let top=r.bottom-v.top+10;if(top+h>v.height-16)top=r.top-v.top-h-10;
+  pop.style.top=Math.max(12,Math.min(v.height-h-12,top))+'px';pop.style.left=Math.max(12,Math.min(v.width-w-12,r.left-v.left))+'px';
+}
+function setSaved(){
+  const n=picked&&notes.find(same(picked));$('psave').classList.toggle('ok',!!n);
+  $('psave').querySelector('span').textContent=n?'Сохранено':'Сохранить';$('pthink').querySelector('span').textContent=n&&n.thought?'Изменить мысль':'Добавить мысль';
+}
+function pick(p){
+  if(picked&&picked.box)picked.box.classList.remove('pick','keep');
+  picked=p;p.box=blockEl(p.i);p.box.classList.add(p.sel?'keep':'pick');sheet(null);reader.classList.remove('quiet');reader.classList.add('pick');
+  pop.classList.remove('think');pop.firstElementChild.textContent='Действия';setSaved();place();pop.classList.add('on');
+}
+function saveNote(p){const n={id:'n'+Date.now(),book:cur.id,title:cur.title,author:cur.author,chapter:chapterOf(p.i),i:p.i,text:p.text,date:Date.now()};notes.unshift(n);return n}
+function afterNote(p){keep();holdSel=1;p.sel=false;markBlock(p.i);setTimeout(()=>{holdSel=0},80);bookNotes();setSaved();place()}
+$('psave').onclick=()=>{const p=picked;if(!p)return;if(notes.some(same(p)))notes=notes.filter(n=>!same(p)(n));else saveNote(p);afterNote(p)};
+$('pcopy').onclick=()=>{const p=picked;if(!p)return;copyText(quote({text:p.text,title:cur.title,author:cur.author}),()=>toast('Скопировано'));drop()};
+/* the same menu turns into a field for your thought */
+$('pthink').onclick=()=>{const p=picked;if(!p)return;let n=notes.find(same(p));if(!n){n=saveNote(p);afterNote(p)}$('ptext').value=n.thought||'';pop.firstElementChild.textContent='Мысль';pop.classList.add('think');fit();$('ptext').focus({preventScroll:true})};
+/* the field grows with what you write, up to a limit, and the menu stays beside the passage */
+function fit(){const t=$('ptext');t.style.height='0';t.style.height=Math.min(168,Math.max(66,t.scrollHeight))+'px';place()}
+$('ptext').oninput=fit;
+$('pback').onclick=()=>{pop.classList.remove('think');pop.firstElementChild.textContent='Действия';setSaved();place()};
+$('pdone').onclick=()=>{const p=picked,n=p&&notes.find(same(p));if(n){const t=$('ptext').value.trim();if(t)n.thought=t;else delete n.thought;keep();toast(t?'Мысль сохранена':'Сохранено')}drop()};
+document.addEventListener('selectionchange',()=>{
+  if(!cur)return;const g=getSelection(),t=g&&!g.isCollapsed?flat(g.toString()):'';
+  if(!t){if(picked&&picked.sel&&!holdSel)unpick();return}
+  let n=g.anchorNode;while(n&&n.parentNode!==text)n=n.parentNode;if(!n)return;
+  const i=[...text.children].indexOf(n)-first;if(i<0)return;
+  const f=cur.blocks[i][1].replace(/\n/g,' '),a=f.indexOf(t);if(a<0)return; /* a selection across blocks is left to the system's own copy */
+  pick({sel:true,i,text:cur.blocks[i][1].slice(a,a+t.length)});
+});
+text.addEventListener('click',e=>{
+  if(getSelection&&String(getSelection()).trim())return;
+  if(sheetOn())return sheet(null);
+  let n=e.target;while(n&&n.parentNode!==text)n=n.parentNode;
+  const i=n?[...text.children].indexOf(n)-first:-1;
+  if(i<0||(picked&&picked.box===n))return drop();
+  pick({i,text:cur.blocks[i][1]});
+});
+/* the book's own notes sit next to its contents */
+let ttab=0;
+function bookNotes(){
+  const box=$('bnotes'),mine=notes.filter(n=>n.book===cur.id).sort((a,b)=>a.i-b.i);box.textContent='';
+  if(!mine.length)box.appendChild(el('p','','В этой книге пока нет заметок'));
+  mine.forEach(n=>{const b=el('button','q',flat(n.text));b.onclick=()=>{sheet(null);rscroll.scrollTop=blockEl(n.i).offsetTop-padTop()-40;tick()};box.appendChild(b)});
+}
+const tocTab=()=>{$('toc').hidden=ttab===1;$('bnotes').hidden=ttab!==1};
+const placeToc=seg('ttabs',['Главы','Заметки'],()=>ttab,i=>ttab=i,tocTab);
+
+rscroll.addEventListener('scroll',()=>{
+  if(!cur)return;
+  const y=rscroll.scrollTop,d=y-lastY;lastY=y;if(picked)place();
+  if(!sheetOn()&&!picked){if(d>6&&y>80)reader.classList.add('quiet');else if(d<-6)reader.classList.remove('quiet')}
+  if(!raf)raf=requestAnimationFrame(tick);
+  clearTimeout(saveT);saveT=setTimeout(savePos,300);
+},{passive:true});
+const KIND={q:'q',s:'s',v:'v'};
+function openBook(b,to){
+  cur=b;unpick();sheet(null);reader.classList.remove('quiet');ls.set('open-'+b.id,Date.now());
+  text.textContent='';text.lang=b.lang||'ru';heads=[];
+  const frag=document.createDocumentFragment();
+  frag.appendChild(el('p','bt',b.title));frag.appendChild(el('p','ba',[b.author,mins(b.words/WPM)].filter(Boolean).join(' · ')));first=2;
+  for(const [t,s] of b.blocks){
+    const e=t==='h'?el('h2','',s):el('p',KIND[t]||'',s);
+    if(t==='h')heads.push({el:e,s});frag.appendChild(e);
+  }
+  text.appendChild(frag);
+  new Set(notes.filter(n=>n.book===b.id).map(n=>n.i)).forEach(markBlock);
+  const toc=$('toc');toc.textContent='';
+  if(!heads.length)toc.appendChild(el('p','','В этой книге не нашлось глав'));
+  heads.forEach(h=>{h.btn=el('button','',h.s);h.btn.onclick=()=>{sheet(null);rscroll.scrollTop=h.el.offsetTop-padTop();tick()};toc.appendChild(h.btn)});
+  ttab=0;tocTab();placeToc();bookNotes();
+  reader.classList.add('on');reader.setAttribute('aria-hidden','false');
+  rscroll.scrollTop=0;goTo(to||posOf(b));if(to){rscroll.scrollTop-=40;const e=blockEl(to.i);if(e){e.classList.add('flash');setTimeout(()=>e.classList.remove('flash'),1800)}}lastY=rscroll.scrollTop;tick();
+}
+function closeBook(){if(!cur)return;savePos();unpick();sheet(null);cur=null;reader.classList.remove('on');reader.setAttribute('aria-hidden','true');render()}
+$('back').onclick=closeBook;
+addEventListener('resize',()=>{segs.forEach(f=>f());if(cur&&!raf)raf=requestAnimationFrame(tick)});
+addEventListener('pagehide',savePos);document.addEventListener('visibilitychange',()=>{if(document.hidden)savePos()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(picked)drop();else if(sheetOn())sheet(null);else if(cur)closeBook();else closePage()}});
+app.addEventListener('scroll',()=>{app.scrollTop=0});
+
+/* ---------- a sample so the first screen is not empty ---------- */
+const SAMPLE={id:'sample',sample:true,fmt:'txt',title:'Как устроен Desharhozam',author:'',lang:'ru',date:0,blocks:[
+  ['p','Это короткий пример вместо книги. Он нужен, чтобы сразу было видно, как выглядит текст, и чтобы было на чём проверить настройки. Его можно убрать из списка.'],
+  ['h','Что она делает'],
+  ['p','Вы отдаёте ей файл книги, а она раскладывает его в одну колонку под ширину телефона. Не нужно увеличивать страницу двумя пальцами и водить её из стороны в сторону, чтобы дочитать строку.'],
+  ['p','Лучше всего получаются FB2 и EPUB. В этих форматах уже записано, где кончается абзац и где начинается глава, поэтому текст переносится точно.'],
+  ['p','С PDF сложнее. Внутри него нет абзацев, есть только буквы и их места на листе. Desharhozam сам догадывается, где красная строка, где заголовок, а где номер страницы, который надо выбросить. На обычной книге в одну колонку это работает. На таблицах, формулах и вёрстке в две колонки она ошибается.'],
+  ['p','Если страницы в PDF — это фотографии, текста в нём нет вовсе. Такой файл Desharhozam честно не откроет и скажет почему.'],
+  ['h','Как читать'],
+  ['p','Листайте вниз. Панель внизу уйдёт, чтобы не мешать, и вернётся, когда вы прокрутите немного назад.'],
+  ['p','Кнопка «Аа» открывает настройки: размер букв, шрифт, насыщенность, фон и фокус. Фокус мягко приглушает строки у краёв экрана, чтобы взгляд держался середины. Если он мешает, его можно выключить.'],
+  ['p','Плашка с названием главы открывает оглавление. Оно собирается из заголовков, которые нашлись в книге.'],
+  ['h','Цитаты и заметки'],
+  ['p','Коснитесь абзаца или выделите несколько слов. Внизу появятся две кнопки: скопировать текст вместе с названием книги или сохранить его в заметки.'],
+  ['p','Сохранённое место подсвечивается в тексте. Все заметки собраны на вкладке «Заметки», оттуда можно вернуться к нужному месту в книге.'],
+  ['h','Что она запоминает'],
+  ['p','Место, на котором вы остановились, в каждой книге своё. Настройки чтения общие для всех книг. Сами книги хранятся в памяти браузера на этом устройстве и никуда не отправляются.'],
+  ['s','* * *'],
+  ['p','В плашке виден процент прочитанного, а в оглавлении — сколько примерно осталось. Время считается из расчёта спокойного темпа, около ста семидесяти слов в минуту.']]};
+SAMPLE.words=SAMPLE.blocks.reduce((n,x)=>n+x[1].split(/\s+/).length,0);
+
+(async function(){
+  applyUi();
+  SAMPLE.locked=!!ls.get('s-lock',false);
+  if(!ls.get('no-sample',0))books=[SAMPLE];go('home');segs.forEach(f=>f());
+  await idbOpen();
+  const saved=(await idb('readonly',s=>s.getAll()))||[];
+  if(saved.length){books=saved.concat(books);render()}
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>segs.forEach(f=>f()));
+})();
+})();
+</script>
+
+<script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
+</body>
+</html>
