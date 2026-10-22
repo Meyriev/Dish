@@ -1,19 +1,19 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-read="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Desharhozam</title>
 <meta name="description" content="Читалка: открывает FB2, EPUB, PDF, DOCX и TXT в одну удобную колонку, хранит цитаты и мысли.">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0a0806">
+<meta name="theme-color" content="#ffffff">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-title" content="Desharhozam">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<style>html,body{margin:0;height:100%;background:#212121}</style>
+<style>html,body{margin:0;height:100%;background:#fff}</style>
 </head>
 <body>
 
@@ -689,8 +689,8 @@ body{font-size:16px;letter-spacing:-.011em}
 .relock svg{display:none}
 .relock{padding-inline:14px;border-radius:16px}
 /* the two quiet actions at the foot of the book sheet sit together */
-.quiet{display:block;width:100%;height:44px;margin-top:32px;border-radius:22px;background:var(--cell);font-size:15px;font-weight:500}
-.quiet:active{transform:scale(.98)}
+button.quiet{display:block;width:100%;height:44px;margin-top:32px;border-radius:22px;background:var(--cell);font-size:15px;font-weight:500}
+button.quiet:active{transform:scale(.98)}
 .bpage .hold{margin-top:8px}
 
 /* whatever runs past an edge fades out instead of being cut */
@@ -779,14 +779,83 @@ article .flash{animation:flash 1.8s var(--ease)}
 .nfoot{gap:12px}
 .nfoot .ni{margin:0;min-width:0;height:32px;padding-inline:4px}
 .nfoot .ni::after{content:"";position:absolute;inset:-6px}
+
+/* Refined surfaces and compositor-friendly motion. */
+:root{--ease:cubic-bezier(.22,1,.36,1);--gut:20px}
+.app{max-width:720px}
+.scroll{padding-top:calc(32px + env(safe-area-inset-top,0px))}
+.lt{font-size:34px;line-height:1.15;font-weight:600;letter-spacing:-.045em;margin-bottom:8px}
+.library-caption{margin:0 4px 24px;color:var(--ink-3);font-size:14px;line-height:1.5}
+.search{height:48px;border-radius:16px;background:var(--tray);box-shadow:inset 0 0 0 1px var(--line);padding-inline:16px}
+.search input{font-size:15px}
+.rows{margin-top:20px;gap:4px}
+.brow{padding:12px 10px;gap:14px;border-radius:18px;animation:none;transition:background .2s,transform .22s var(--ease)}
+.cv.th{width:52px;border-radius:8px}
+.brow .et b{font-size:16px;line-height:1.35;font-weight:500;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.brow .et i{font-size:13px;margin-top:5px;line-height:1.4}
+.get{min-height:40px;padding-inline:14px;font-size:13px}
+.ldock{padding:6px;width:max-content;max-width:calc(100% - 24px);left:50%;right:auto;transform:translateX(-50%);border-radius:32px;background:var(--tray);box-shadow:0 8px 32px #00000020,inset 0 0 0 1px var(--line)}
+.ldock .seg.big{box-shadow:none;background:transparent}
+#add{background:var(--cell)}
+.bpage{clip-path:none!important;transform:translateY(104%);opacity:0;visibility:hidden;transition:transform .44s var(--ease),opacity .24s,visibility 0s .44s}
+.bpage.on{transform:translateY(0);opacity:1;visibility:visible;transition:transform .44s var(--ease),opacity .24s}
+.app.deep .scroll{transform:scale(.975);opacity:.5}
+.sheet{clip-path:none!important;opacity:0;visibility:hidden;transform:translateY(16px) scale(.98);transition:transform .32s var(--ease),opacity .2s,visibility 0s .32s}
+.reader.s-set #pset,.reader.s-toc #ptoc{opacity:1;visibility:visible;transform:none;transition:transform .32s var(--ease),opacity .2s}
+.cc{will-change:auto}
+.note{box-shadow:inset 0 0 0 1px var(--line);border-radius:24px}
+.note .nq{line-height:1.6}
+.bp-t{text-wrap:balance;letter-spacing:-.035em}
+.reader{transition:transform .44s var(--ease),visibility 0s .44s,background .3s}
+.reader.on{transition:transform .44s var(--ease),background .3s}
+@media(min-width:760px){.app{border-inline:1px solid var(--line)}.scroll{padding:48px 40px 120px}.rscroll{padding-inline:64px}.bscroll{padding-inline:48px}.lt{font-size:40px}.brow{padding-block:16px}.cv.th{width:60px}}
+@media(max-width:360px){:root{--gut:14px}.get{padding-inline:10px}.brow{gap:10px}.ldock{gap:4px}.library-caption{font-size:13px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* White editorial library: the covers are the content, chrome stays quiet. */
+:root[data-read="light"]{--bg:#fff;--tray:#f5f5f4;--cell:#efefed;--ink:#222321;--ink-2:#484a46;--ink-3:#7c7f78;--pri:#252723;--pri-on:#fff;--line:#2028200c;--line-2:#20282018}
+.library-caption{font-size:13px;letter-spacing:.01em;color:var(--ink-3);margin-bottom:24px}
+.lt{font-weight:500;letter-spacing:-.055em}
+.search{border-radius:24px;box-shadow:none;height:44px}
+.library-tools{display:flex;align-items:center;justify-content:space-between;padding:22px 4px 0;font-size:12px;color:var(--ink-3)}
+#layout-toggle{min-height:44px;padding:0 10px;border-radius:22px;font-size:12px;color:var(--ink-2)}
+#layout-toggle:hover{background:var(--tray)}
+#hlist.shelf{display:flex;align-items:center;gap:0;padding:24px 12px 38px;isolation:isolate}
+.shelf-book{position:relative;flex:none;width:min(268px,85%);height:260px;transform:rotate(var(--angle));border-radius:5px;text-align:left;background:var(--tray);box-shadow:0 18px 24px -16px #1b241d55,0 2px 6px #1b241d1a;transition:transform .42s var(--ease),box-shadow .3s}
+.shelf-book+.shelf-book{margin-top:-132px}
+.shelf-book .cv{width:100%;height:100%;aspect-ratio:auto;border-radius:5px;container-type:normal}
+.shelf-book .cv b,.shelf-book .cv i{display:none}
+.shelf-book .cv img{object-fit:cover;object-position:top}
+.shelf-label{position:absolute;left:0;right:0;top:0;padding:20px 22px 28px;background:linear-gradient(var(--tray) 80%,transparent);color:var(--ink);border-radius:5px 5px 0 0}
+.shelf-label b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font:400 27px/1.08 var(--serif);letter-spacing:-.035em}
+.shelf-label>span{display:block;font-size:10px;letter-spacing:.04em;margin-top:8px;color:var(--ink-3)}
+.shelf-book:focus-visible{z-index:2;transform:translateY(-16px) rotate(0)}
+@media(hover:hover){.shelf-book:hover{z-index:2;transform:translateY(-16px) rotate(0);box-shadow:0 22px 36px -14px #1b241d55}}
+.shelf-book:active{transform:translateY(-8px) scale(.98)}
+.ldock{background:var(--bg);box-shadow:0 8px 36px #00000012,inset 0 0 0 1px var(--line);gap:10px;padding:5px}
+.ldock .seg.big{background:var(--pri);width:208px}
+.ldock .seg.big button{color:var(--pri-on);opacity:.6}
+.ldock .seg.big button[aria-pressed="true"]{color:var(--pri-on);opacity:1}
+.ldock .seg.big .th{background:#ffffff1a;box-shadow:none}
+#add{background:var(--tray);box-shadow:none}
+.reader.pick article>*:not(.pick):not(.keep){opacity:1}
+.pop{box-shadow:0 8px 32px #00000018,inset 0 0 0 1px var(--line);border-radius:18px}
+.fade.t{height:36px}.fade.b{height:80px}
+@media(min-width:760px){.app{max-width:880px}.scroll{padding-inline:64px}.shelf-book{width:300px;height:290px}.shelf-book+.shelf-book{margin-top:-150px}.rscroll{padding-inline:90px}}
+@media(prefers-reduced-motion:reduce){.shelf-book{transition:none}}
+
+.shelf-book.typeset .cv{background:#e8e9e1!important;color:#333c30!important;background-image:repeating-linear-gradient(0deg,transparent 0 22px,#333c3007 22px 23px)!important}
+.shelf-book.typeset .shelf-label{background:#e8e9e1;color:#333c30;border-bottom:1px solid #333c3020;padding-bottom:16px}
+.shelf-book.typeset .cv em{top:auto;bottom:-18px;right:18px;font:400 170px/1 var(--serif);opacity:.12}
+.cover-format{position:absolute;bottom:22px;left:22px;font-size:10px;letter-spacing:.16em}
 </style>
 
 <div class="app" id="app">
   <div class="scroll" id="scroll">
     <div class="view" id="v-home">
-      <h1 class="lt">Книги</h1>
+      <h1 class="lt">Книги</h1><p class="library-caption">Время для новой главы.</p>
       <label class="search"><svg viewBox="0 0 18 18"><circle cx="8" cy="8" r="5"/><path d="M12 12l3.5 3.5"/></svg><input id="q" autocomplete="off" enterkeyhint="search" placeholder="Поиск по книгам и тексту" aria-label="Поиск"><button type="button" class="ni" id="qx" aria-label="Очистить" hidden><svg viewBox="0 0 18 18"><path d="M4.5 4.5l9 9M13.5 4.5l-9 9"/></svg></button></label>
-      <div class="rows" id="hlist"></div>
+      <div class="library-tools"><span id="library-count">Ваша библиотека</span><button id="layout-toggle" aria-label="Показать списком" aria-pressed="false">Списком <span aria-hidden="true">☷</span></button></div><div class="rows" id="hlist"></div>
     </div>
     <div class="view" id="v-notes" hidden><h1 class="lt">Заметки</h1>
       <label class="search" id="nsearch"><svg viewBox="0 0 18 18"><circle cx="8" cy="8" r="5"/><path d="M12 12l3.5 3.5"/></svg><input id="nq" autocomplete="off" enterkeyhint="search" placeholder="Поиск по заметкам" aria-label="Поиск по заметкам"></label>
@@ -1140,7 +1209,7 @@ const initial=b=>(b.title.match(/[A-Za-zА-Яа-яЁё0-9]/)||['·'])[0].toUpper
 const pct=b=>Math.round((posOf(b).p||0)*100);
 function cover(b,cls){ /* the file's own cover, or one set from the title */
   const c=el('span','cv'+(cls?' '+cls:''));
-  if(b.cover){const im=el('img');im.src=b.cover;im.alt='';c.appendChild(im)}
+  if(b.cover){const im=el('img');im.src=b.cover;im.alt='';im.decoding='async';im.loading='lazy';c.appendChild(im)}
   else{const [bg,ink]=tint(b);c.style.background=bg;c.style.color=ink;c.append(el('b','',b.title),el('i','',b.author||b.fmt))}
   const p=el('u');p.style.setProperty('--p',posOf(b).p||0);c.appendChild(p);return c;
 }
@@ -1155,9 +1224,10 @@ const flat=s=>s.replace(/\s+/g,' ').trim();
 const quote=n=>'«'+n.text+'»\n— '+[n.author,n.title].filter(Boolean).join(', ');
 /* ribbons: the card nearest the middle is full size, the others step back a little */
 function tune(car){
-  const mid=car.getBoundingClientRect().left+car.clientWidth/2;
-  for(const c of car.children){const r=c.getBoundingClientRect(),d=Math.min(1,Math.abs(r.left+r.width/2-mid)/r.width);const side=r.left+r.width/2<mid?1:-1;
-    c.style.transform='perspective(900px) rotateY('+(side*d*20)+'deg) scale('+(1-d*.1)+')';c.style.opacity=1-d*.5}
+  // Read untransformed geometry first; write styles only after all reads.
+  const mid=car.scrollLeft+car.clientWidth/2;
+  const positions=[...car.children].map(c=>({c,d:Math.min(1,Math.abs(c.offsetLeft-car.offsetLeft+c.offsetWidth/2-mid)/Math.max(1,c.offsetWidth))}));
+  for(const {c,d} of positions){c.style.transform='scale('+(1-d*.035)+')';c.style.opacity=1-d*.18}
 }
 function ribbon(cards){
   const car=el('div','car');cards.forEach(c=>car.appendChild(c));
@@ -1171,8 +1241,8 @@ function toast(msg){const t=$('toast');t.lastChild.textContent=msg;t.classList.a
 /* a control changes what it says: the old content shrinks and blurs out, the new one comes in */
 function morph(elm,set){
   if(still||!elm.animate){set();return}
-  elm.animate([{opacity:1,transform:'none',filter:'blur(0)'},{opacity:0,transform:'scale(.6)',filter:'blur(4px)'}],{duration:110,easing:'ease-in'}).onfinish=()=>{
-    set();elm.animate([{opacity:0,transform:'scale(.6)',filter:'blur(4px)'},{opacity:1,transform:'none',filter:'blur(0)'}],{duration:200,easing:'cubic-bezier(.22,1,.36,1)'})};
+  elm.animate([{opacity:1,transform:'none',},{opacity:0,transform:'scale(.94)',}],{duration:110,easing:'ease-in'}).onfinish=()=>{
+    set();elm.animate([{opacity:0,transform:'scale(.94)',},{opacity:1,transform:'none',}],{duration:200,easing:'cubic-bezier(.22,1,.36,1)'})};
 }
 /* ---------- hidden under a code: a book or a note shows no name and no text until the code is entered ---------- */
 const LOCK='<svg viewBox="0 0 18 18"><rect x="4" y="8" width="10" height="7" rx="2"/><path d="M6.5 8V6a2.5 2.5 0 015 0v2"/></svg>';
@@ -1224,6 +1294,8 @@ function render(){
 }
 
 /* ---------- home: one list; typing in the field turns the same list into search results ---------- */
+let shelfMode=ls.get('library-layout','shelf');
+$('layout-toggle').onclick=()=>{shelfMode=shelfMode==='shelf'?'list':'shelf';ls.set('library-layout',shelfMode);renderHome()};
 let qT=0;
 $('q').oninput=()=>{qOpen=null;clearTimeout(qT);qT=setTimeout(renderHome,140)};
 $('qx').onclick=e=>{e.preventDefault();$('q').value='';renderHome();$('q').focus()};
@@ -1237,6 +1309,14 @@ function bookRow(b,box,first){
   if(hiddenB(b)){r.classList.add('lk');et.textContent='';et.append(el('b','','Скрытая книга'),el('i','','Под кодом'));o.setAttribute('aria-label','Скрытая книга');o.onclick=()=>ask(()=>openPage(b));g.innerHTML=LOCK;g.className='get';g.setAttribute('aria-label','Открыть по коду');g.onclick=()=>ask(()=>openBook(b))}
   r.append(o,c,et,g);box.appendChild(r);
 }
+function shelfBook(b,k,box){
+  const card=el('button','shelf-book');card.dataset.id=b.id;
+  card.style.setProperty('--angle',[-3,2,-1.5,2.5][k%4]+'deg');
+  card.setAttribute('aria-label','Открыть книгу: '+b.title);card.onclick=()=>openPage(b);
+  const cv=cover(b);if(!b.cover){card.classList.add('typeset');cv.append(el('em','',initial(b)),el('span','cover-format',b.fmt.toUpperCase()))}card.append(cv);
+  const label=el('span','shelf-label');label.append(el('b','',b.title),el('span','',b.author||'Desharhozam'));
+  card.append(label);box.append(card);
+}
 function hitRow(b,i,text,q,sub,box){
   const low=text.toLowerCase(),a=low.indexOf(q),from=Math.max(0,a-36),r=el('div','brow'),o=el('button','eopen'),et=el('div','et'),t=el('b','wrap');
   o.onclick=()=>openBook(b,{i,f:0});
@@ -1245,7 +1325,13 @@ function hitRow(b,i,text,q,sub,box){
 }
 function renderHome(){
   document.querySelector('#v-home .lt').textContent=unlocked?'Скрытые':'Книги';
-  const qv=$('q').value.trim();$('qx').hidden=!qv;if(!qv)qOpen=null;
+  const qv=$('q').value.trim();$('qx').hidden=!qv;
+  const shelf=shelfMode==='shelf'&&!qv;
+  $('hlist').classList.toggle('shelf',shelf);
+  $('layout-toggle').textContent=shelf?'Списком ☷':'Обложки ▤';
+  $('layout-toggle').setAttribute('aria-label',shelf?'Показать списком':'Показать обложки');
+  $('layout-toggle').setAttribute('aria-pressed',String(!shelf));
+  $('library-count').textContent='В библиотеке · '+books.filter(b=>!hiddenB(b)).length;if(!qv)qOpen=null;
   renderHomeCore();if(!qv){dupRow($('hlist'));hidRow($('hlist'),books.some(isHidB),'Скрытые')}
 }
 function renderHomeCore(){
@@ -1253,7 +1339,7 @@ function renderHomeCore(){
   if(!bs.length&&(unlocked||books.some(isHidB))){if(unlocked)box.appendChild(el('p','hint','Скрытых книг нет'));return}
   if(!bs.length){box.appendChild(el('p','hint','Здесь будут ваши книги. Нажмите плюс и выберите файл: FB2, EPUB, PDF, DOCX или TXT.'));return}
   box.classList.toggle('q',!!q);
-  if(!q){bs.forEach((b,k)=>bookRow(b,box,k===0));return}
+  if(!q){if(shelfMode==='shelf')bs.forEach((b,k)=>shelfBook(b,k,box));else bs.forEach((b,k)=>bookRow(b,box,k===0));return}
   /* results come in three labelled parts: books by name, your notes, places in the text gathered by book */
   const head=(t,c)=>box.appendChild(el('p','ghead',t+' · '+c));
   const bk=bs.filter(b=>(b.title+' '+b.author).toLowerCase().includes(q));
@@ -1375,10 +1461,10 @@ function rowInset(id,scaled){
 }
 function openPage(b){
   pageBook=b;allCh=false;renderPage(b);$('bbody').scrollTop=0;
-  bpage.style.transition='none';bpage.style.clipPath=rowInset(b.id);bpage.offsetWidth;bpage.style.transition='';
+  bpage.style.transform='';
   bpage.classList.add('on');bpage.setAttribute('aria-hidden','false');app.classList.add('deep');bpage.style.clipPath=FULL;
 }
-function closePage(){if(!pageBook)return;bpage.style.clipPath=rowInset(pageBook.id,true);app.classList.remove('deep');pageBook=null;bpage.classList.remove('on');bpage.setAttribute('aria-hidden','true')}
+function closePage(){if(!pageBook)return;app.classList.remove('deep');pageBook=null;bpage.classList.remove('on');bpage.setAttribute('aria-hidden','true')}
 $('bclose').onclick=closePage;
 $('bgrab').onkeydown=e=>{if(e.key==='Enter'||e.key===' ')closePage()};
 $('scroll').addEventListener('click',e=>{if(pageBook){e.stopPropagation();closePage()}},true); /* the strip of the list above the sheet closes it */
@@ -1423,11 +1509,14 @@ function renderPage(b){
 const FONTS=[['Inter',"Inter,-apple-system,'Segoe UI',Roboto,sans-serif"],['Plex',"'IBM Plex Sans','Segoe UI',Roboto,sans-serif"],['Literata',"Literata,'Iowan Old Style',Georgia,serif"],['Source',"'Source Serif 4',Georgia,serif"]];
 const WEIGHTS=[[400,'Обычная'],[500,'Плотнее']];
 const THEMES=[['dark','Тёмный'],['light','Светлый'],['paper','Бумага']];
-const ui=Object.assign({fs:19,font:0,fw:400,theme:'dark',focus:true},ls.get('reader-ui-2',{}));
-if(!THEMES.some(t=>t[0]===ui.theme))ui.theme='dark';
+const ui=Object.assign({fs:19,font:0,fw:400,theme:'light',focus:false},ls.get('reader-ui-2',{}));
+if(!THEMES.some(t=>t[0]===ui.theme))ui.theme='light';
+// One-time adoption of the new light default; later user choices remain intact.
+if(!ls.get('light-design-1',false)){ui.theme='light';ui.focus=false;ls.set('light-design-1',true)}
 function applyUi(){
   const at=cur?where():null,r=document.documentElement;
   if(ui.theme==='dark')delete r.dataset.read;else r.dataset.read=ui.theme;
+  document.querySelector('meta[name="theme-color"]').content=ui.theme==='dark'?'#212121':ui.theme==='paper'?'#faf9f5':'#ffffff';
   r.style.setProperty('--fs',ui.fs+'px');r.style.setProperty('--read',FONTS[ui.font][1]);r.style.setProperty('--fw',ui.fw);
   reader.classList.toggle('plain',!ui.focus);$('fval').textContent=ui.fs;$('fsize').value=ui.fs;$('fsize').style.setProperty('--v',(ui.fs-15)/13);ls.set('reader-ui-2',ui);
   if(at){goTo(at);tick()}
@@ -1450,13 +1539,19 @@ function where(){ /* which block sits at the reading line, and how far into it *
 function goTo(at){const k=blockEl(at.i);if(k)rscroll.scrollTop=k.offsetTop-padTop()+at.f*k.offsetHeight}
 function progress(){const max=rscroll.scrollHeight-rscroll.clientHeight;return max>0?Math.max(0,Math.min(1,rscroll.scrollTop/max)):1}
 let raf=0,saveT=0,lastY=0;
+let lastPercent=-1,lastChapter=null,lastRemaining='';
 function tick(){
   raf=0;if(!cur)return;
-  const p=progress();
-  $('rchip').innerHTML=p>=.995?okSvg:ringSvg(p);$('rchip').append(Math.round(p*100)+'%');$('tleft').textContent=p>=.995?'Дочитано':'Осталось '+mins(cur.words*(1-p)/WPM);
-  const y=rscroll.scrollTop+padTop()+8;let h=null;for(const x of heads){if(x.el.offsetTop<=y)h=x;else break}
-  $('rname').textContent=h?h.s:cur.title;ruler.style.setProperty('--p',p);
-  heads.forEach(x=>x.btn&&x.btn.classList.toggle('now',x===h));
+  const p=progress(),percent=p>=.995?100:Math.min(99,Math.round(p*100)),remaining=p>=.995?'Дочитано':'Осталось '+mins(cur.words*(1-p)/WPM);
+  const y=rscroll.scrollTop+padTop()+8;
+  let lo=0,hi=heads.length-1,h=null;
+  while(lo<=hi){const m=(lo+hi)>>1;if(heads[m].el.offsetTop<=y){h=heads[m];lo=m+1}else hi=m-1}
+  // All layout reads precede DOM writes; update labels only when changed.
+  if(percent!==lastPercent){$('rchip').innerHTML=p>=.995?okSvg:ringSvg(p);$('rchip').append(percent+'%');lastPercent=percent}
+  if(remaining!==lastRemaining){$('tleft').textContent=remaining;lastRemaining=remaining}
+  const name=h?h.s:cur.title;if($('rname').textContent!==name)$('rname').textContent=name;
+  if(h!==lastChapter){if(lastChapter&&lastChapter.btn)lastChapter.btn.classList.remove('now');if(h&&h.btn)h.btn.classList.add('now');lastChapter=h}
+  if(sheetOn())ruler.style.setProperty('--p',p);
 }
 function savePos(){if(cur)ls.set('pos-'+cur.id,Object.assign(where(),{p:progress()}))}
 
@@ -1475,7 +1570,7 @@ const sheetOn=()=>reader.classList.contains('s-set')||reader.classList.contains(
 function sheet(w){
   reader.classList.remove('s-set','s-toc');if(!w)return;
   reader.classList.add('s-'+w);segs.forEach(f=>f());
-  if(w==='toc'){ticks();const n=$('toc').querySelector('.now');if(n)n.parentNode.scrollTop=n.offsetTop-n.parentNode.clientHeight/2}
+  if(w==='toc'){tick();ticks();const n=$('toc').querySelector('.now');if(n)n.parentNode.scrollTop=n.offsetTop-n.parentNode.clientHeight/2}
 }
 $('aa').onclick=()=>sheet(reader.classList.contains('s-set')?null:'set');
 $('info').onclick=()=>sheet(reader.classList.contains('s-toc')?null:'toc');
@@ -1530,13 +1625,10 @@ document.addEventListener('selectionchange',()=>{
   const f=cur.blocks[i][1].replace(/\n/g,' '),a=f.indexOf(t);if(a<0)return; /* a selection across blocks is left to the system's own copy */
   pick({sel:true,i,text:cur.blocks[i][1].slice(a,a+t.length)});
 });
-text.addEventListener('click',e=>{
+text.addEventListener('click',()=>{
   if(getSelection&&String(getSelection()).trim())return;
-  if(sheetOn())return sheet(null);
-  let n=e.target;while(n&&n.parentNode!==text)n=n.parentNode;
-  const i=n?[...text.children].indexOf(n)-first:-1;
-  if(i<0||(picked&&picked.box===n))return drop();
-  pick({i,text:cur.blocks[i][1]});
+  if(sheetOn())sheet(null);
+  if(picked)drop();
 });
 /* the book's own notes sit next to its contents */
 let ttab=0;
@@ -1550,6 +1642,7 @@ const placeToc=seg('ttabs',['Главы','Заметки'],()=>ttab,i=>ttab=i,to
 
 rscroll.addEventListener('scroll',()=>{
   if(!cur)return;
+  if(picked&&!pop.classList.contains('think'))drop();
   const y=rscroll.scrollTop,d=y-lastY;lastY=y;if(picked)place();
   if(!sheetOn()&&!picked){if(d>6&&y>80)reader.classList.add('quiet');else if(d<-6)reader.classList.remove('quiet')}
   if(!raf)raf=requestAnimationFrame(tick);
@@ -1557,7 +1650,7 @@ rscroll.addEventListener('scroll',()=>{
 },{passive:true});
 const KIND={q:'q',s:'s',v:'v'};
 function openBook(b,to){
-  cur=b;unpick();sheet(null);reader.classList.remove('quiet');ls.set('open-'+b.id,Date.now());
+  lastPercent=-1;lastChapter=null;lastRemaining='';cur=b;unpick();sheet(null);reader.classList.remove('quiet');ls.set('open-'+b.id,Date.now());
   text.textContent='';text.lang=b.lang||'ru';heads=[];
   const frag=document.createDocumentFragment();
   frag.appendChild(el('p','bt',b.title));frag.appendChild(el('p','ba',[b.author,mins(b.words/WPM)].filter(Boolean).join(' · ')));first=2;
@@ -1594,7 +1687,7 @@ const SAMPLE={id:'sample',sample:true,fmt:'txt',title:'Как устроен Des
   ['p','Кнопка «Аа» открывает настройки: размер букв, шрифт, насыщенность, фон и фокус. Фокус мягко приглушает строки у краёв экрана, чтобы взгляд держался середины. Если он мешает, его можно выключить.'],
   ['p','Плашка с названием главы открывает оглавление. Оно собирается из заголовков, которые нашлись в книге.'],
   ['h','Цитаты и заметки'],
-  ['p','Коснитесь абзаца или выделите несколько слов. Внизу появятся две кнопки: скопировать текст вместе с названием книги или сохранить его в заметки.'],
+  ['p','Выделите нужные слова: мышью на компьютере или долгим нажатием на телефоне. Появится небольшое меню: сохранить цитату, скопировать её или добавить свою мысль.'],
   ['p','Сохранённое место подсвечивается в тексте. Все заметки собраны на вкладке «Заметки», оттуда можно вернуться к нужному месту в книге.'],
   ['h','Что она запоминает'],
   ['p','Место, на котором вы остановились, в каждой книге своё. Настройки чтения общие для всех книг. Сами книги хранятся в памяти браузера на этом устройстве и никуда не отправляются.'],
